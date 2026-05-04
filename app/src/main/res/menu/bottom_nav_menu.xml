@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/bottom_nav_dashboard"
+        android:icon="@drawable/ic_home"
+        android:title="Home" />
+
+    <item
+        android:id="@+id/bottom_nav_watch"
+        android:icon="@drawable/ic_sleep"
+        android:title="Sleep" />
+
+    <item
+        android:id="@+id/bottom_nav_devices"
+        android:icon="@drawable/ic_watch"
+        android:title="Device" />
+
+    <item
+        android:id="@+id/bottom_nav_leaderboard"
+        android:icon="@drawable/ic_debt_sleep"
+        android:title="Debt Sleep" />
+
+    <item
+        android:id="@+id/bottom_nav_about"
+        android:icon="@drawable/ic_about"
+        android:title="About" />
+
+</menu>

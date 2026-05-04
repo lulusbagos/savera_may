@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#EFFAFD"
+    tools:context=".activities.LoginActivity">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="top|center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:adjustViewBounds="true"
+                android:background="@android:color/transparent"
+                android:scaleType="fitStart"
+                android:src="@drawable/bg_login" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/_20sdp"
+                android:textStyle="bold"
+                android:textAlignment="center"
+                android:text="Welcome"
+                android:textColor="#000"
+                android:layout_marginVertical="@dimen/_30sdp"
+                android:layout_marginHorizontal="@dimen/_20sdp"
+                tools:ignore="HardcodedText" />
+
+            <EditText
+                android:id="@+id/textUser"
+                android:layout_width="@dimen/_250sdp"
+                android:layout_height="@dimen/_35sdp"
+                android:autofillHints=""
+                android:hint="NIK"
+                android:inputType="text"
+                android:background="@drawable/bg_input"
+                android:paddingHorizontal="@dimen/_10sdp"
+                android:drawableStart="@drawable/ic_person"
+                android:drawablePadding="@dimen/_5sdp"
+                android:layout_marginBottom="@dimen/_20sdp"
+                tools:ignore="HardcodedText" />
+
+            <EditText
+                android:id="@+id/textPassword"
+                android:layout_width="@dimen/_250sdp"
+                android:layout_height="@dimen/_35sdp"
+                android:autofillHints=""
+                android:hint="Password"
+                android:inputType="textPassword"
+                android:background="@drawable/bg_input"
+                android:paddingHorizontal="@dimen/_10sdp"
+                android:drawableStart="@drawable/ic_lock"
+                android:drawablePadding="@dimen/_5sdp"
+                android:layout_marginBottom="@dimen/_20sdp"
+                tools:ignore="HardcodedText" />
+
+            <CheckBox
+                android:id="@+id/rememberMe"
+                android:layout_width="@dimen/_250sdp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="-8dp"
+                android:layout_marginBottom="8dp"
+                android:text="Ingat Saya"
+                android:textColor="#1A1A1A"
+                tools:ignore="HardcodedText" />
+
+            <Button
+                android:id="@+id/btnLogin"
+                android:layout_width="@dimen/_170sdp"
+                android:layout_height="wrap_content"
+                android:padding="@dimen/_5sdp"
+                android:text="Login"
+                android:textSize="@dimen/_14sdp"
+                android:backgroundTint="@drawable/bg_button"
+                android:layout_marginTop="@dimen/_20sdp" />
+
+            <Button
+                android:id="@+id/btnRegister"
+                android:layout_width="@dimen/_170sdp"
+                android:layout_height="wrap_content"
+                android:padding="@dimen/_5sdp"
+                android:text="Register"
+                android:textSize="@dimen/_14sdp"
+                android:backgroundTint="@drawable/bg_button"
+                android:visibility="gone"
+                android:layout_marginTop="@dimen/_20sdp" />
+
+            <TextView
+                android:id="@+id/textVersion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/_10sdp"
+                android:textAlignment="center"
+                android:text="Versi 2.0.0"
+                android:textColor="#000"
+                android:layout_marginTop="@dimen/_10sdp"
+                android:layout_marginBottom="@dimen/_50sdp"
+                android:visibility="gone"
+                tools:ignore="HardcodedText" />
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

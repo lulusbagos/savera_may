@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    app:iconSpaceReserved="false">
+
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="general_autostartonboot"
+        android:layout="@layout/preference_checkbox"
+        android:title="@string/pref_title_general_autostartonboot"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="show_changelog"
+        android:layout="@layout/preference_checkbox"
+        android:summary="@string/pref_show_changelog_summary"
+        android:title="@string/pref_show_changelog"
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false" />
+
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="general_autoconnectonbluetooth"
+        android:layout="@layout/preference_checkbox"
+        android:title="@string/pref_title_general_autoconnectonbluetooth"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="general_reconnectonlytoconnected"
+        android:layout="@layout/preference_checkbox"
+        android:summary="@string/pref_summary_general_reconnectonlytoconnected"
+        android:title="@string/pref_title_general_reconnectonlytoconnected"
+        app:iconSpaceReserved="false" />
+
+    <PreferenceCategory
+        android:title="@string/pref_header_auto_fetch"
+        app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="auto_fetch_enabled"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/pref_auto_fetch_summary"
+            android:title="@string/pref_auto_fetch"
+            app:iconSpaceReserved="false" />
+        <EditTextPreference
+            android:defaultValue="0"
+            android:dependency="auto_fetch_enabled"
+            android:inputType="number"
+            android:key="auto_fetch_interval_limit"
+            android:maxLength="3"
+            android:summary="@string/pref_auto_fetch_limit_fetches_summary"
+            android:title="@string/pref_auto_fetch_limit_fetches"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_key_datetime"
+        android:title="@string/pref_header_datetime"
+        app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="datetime_synconconnect"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/pref_summary_datetime_syctimeonconnect"
+            android:title="@string/pref_title_datetime_syctimeonconnect"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/pref_header_location"
+        app:iconSpaceReserved="false">
+        <Preference
+            android:key="location_aquire"
+            android:title="@string/pref_title_location_aquire"
+            app:iconSpaceReserved="false"
+            app:isPreferenceVisible="false" />
+        <EditTextPreference
+            android:defaultValue="0"
+            android:inputType="numberDecimal|numberSigned"
+            android:key="location_latitude"
+            android:maxLength="7"
+            android:title="@string/pref_title_location_latitude"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true"
+            app:isPreferenceVisible="false" />
+        <EditTextPreference
+            android:defaultValue="0"
+            android:inputType="numberDecimal|numberSigned"
+            android:key="location_longitude"
+            android:maxLength="7"
+            android:title="@string/pref_title_location_longitude"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true"
+            app:isPreferenceVisible="false" />
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:dependency="location_aquire"
+            android:key="use_updated_location_if_available"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/pref_summary_location_keep_uptodate"
+            android:title="@string/pref_title_location_keep_uptodate"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

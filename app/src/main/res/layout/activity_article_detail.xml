@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white"
+    tools:context=".activities.ArticleDetailActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/_15sdp"
+            android:background="@android:color/white"
+            android:elevation="@dimen/_4sdp">
+
+            <ImageButton
+                android:id="@+id/btnBack"
+                android:layout_width="@dimen/_25sdp"
+                android:layout_height="@dimen/_25sdp"
+                android:background="@android:color/transparent"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_back"
+                android:contentDescription="Back" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="Detail Artikel"
+                android:textColor="#000"
+                android:textSize="@dimen/_16sdp"
+                android:textStyle="bold" />
+
+        </RelativeLayout>
+
+        <!-- Article Image -->
+        <ImageView
+            android:id="@+id/articleDetailImage"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/_200sdp"
+            android:scaleType="centerCrop"
+            android:background="@color/chart_deep_sleep_light"
+            android:contentDescription="Article Image" />
+
+        <!-- Content Container -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/_15sdp">
+
+            <!-- Category -->
+            <TextView
+                android:id="@+id/articleDetailCategory"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_rounded"
+                android:paddingHorizontal="@dimen/_10sdp"
+                android:paddingVertical="@dimen/_5sdp"
+                android:text="Kategori"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/_11sdp"
+                android:textStyle="bold" />
+
+            <!-- Title -->
+            <TextView
+                android:id="@+id/articleDetailTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/_12sdp"
+                android:text="Judul Artikel"
+                android:textColor="#000"
+                android:textSize="@dimen/_18sdp"
+                android:textStyle="bold" />
+
+            <!-- Meta Info -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/_10sdp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/articleDetailAuthor"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Penulis"
+                    android:textColor="#666"
+                    android:textSize="@dimen/_10sdp"
+                    android:drawableLeft="@drawable/ic_person"
+                    android:drawablePadding="@dimen/_4sdp"
+                    android:drawableTint="#666" />
+
+                <TextView
+                    android:id="@+id/articleDetailDate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="01 Jan 2026"
+                    android:textColor="#666"
+                    android:textSize="@dimen/_10sdp"
+                    android:drawableLeft="@drawable/ic_calendar_from"
+                    android:drawablePadding="@dimen/_4sdp"
+                    android:drawableTint="#666" />
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="@dimen/_15sdp"
+                android:layout_marginBottom="@dimen/_15sdp"
+                android:background="#E0E0E0" />
+
+            <!-- Content -->
+            <TextView
+                android:id="@+id/articleDetailContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Konten artikel akan ditampilkan di sini..."
+                android:textColor="#333"
+                android:textSize="@dimen/_12sdp"
+                android:lineSpacingExtra="@dimen/_4sdp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

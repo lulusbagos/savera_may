@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F2F2F2"
+    tools:context=".activities.IzinActivity">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        tools:ignore="MissingConstraints">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="start"
+            android:layout_marginTop="@dimen/_30sdp"
+            android:layout_marginLeft="@dimen/_15sdp">
+
+            <ImageButton
+                android:id="@+id/btnBack"
+                android:layout_width="@dimen/_25sdp"
+                android:layout_height="@dimen/_25sdp"
+                android:contentDescription="ic_back"
+                android:background="@android:color/transparent"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_back"
+                tools:ignore="ContentDescription,HardcodedText" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/_16sdp"
+                android:text="Ajukan Izin"
+                android:textColor="#000"
+                android:layout_marginLeft="@dimen/_15sdp"
+                tools:ignore="HardcodedText" />
+
+        </LinearLayout>
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        tools:ignore="MissingConstraints">
+
+        <ImageButton
+            android:id="@+id/btnOpen"
+            android:layout_width="@dimen/_25sdp"
+            android:layout_height="@dimen/_25sdp"
+            android:contentDescription="ic_calendar_from"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_share"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentRight="true"
+            android:layout_marginTop="@dimen/_30sdp"
+            android:layout_marginRight="@dimen/_15sdp"
+            android:visibility="gone"
+            tools:ignore="ContentDescription,HardcodedText" />
+
+    </RelativeLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/my_izin"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:layout_marginTop="@dimen/_80sdp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/my_izin_print"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginBottom="@dimen/_50sdp"
+                android:gravity="top|center"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/my_izin_inner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/_15sdp"
+                    android:layout_marginBottom="@dimen/_15sdp"
+                    android:background="@drawable/bg_box"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="@dimen/_15sdp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="PT UNGGUL DINAMIKA UTAMA"
+                        android:textSize="@dimen/_14sdp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/_10sdp"
+                        android:text="Site Project Indexim"
+                        android:textSize="@dimen/_12sdp" />
+
+                    <TextView
+                        android:id="@+id/textDate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/_10sdp"
+                        android:text="-"
+                        android:textSize="@dimen/_10sdp" />
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_margin="@dimen/_2sdp"
+                        app:cardBackgroundColor="#FFF"
+                        app:cardCornerRadius="@dimen/_8sdp"
+                        app:cardElevation="1dp"
+                        app:cardUseCompatPadding="false">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_margin="@dimen/_10sdp"
+                            android:gravity="top|center"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginVertical="@dimen/_5sdp"
+                                android:gravity="top|center"
+                                android:orientation="horizontal">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center"
+                                    android:orientation="vertical">
+
+                                    <TextView
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:text="NIK"
+                                        android:textColor="#666"
+                                        android:textSize="@dimen/_10sdp"
+                                        tools:ignore="HardcodedText" />
+
+                                    <TextView
+                                        android:id="@+id/textNik"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:text="-"
+                                        android:textColor="#000"
+                                        android:textSize="@dimen/_12sdp"
+                                        tools:ignore="HardcodedText" />
+
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center"
+                                    android:orientation="vertical">
+
+                                    <TextView
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:text="Nama"
+                                        android:textColor="#666"
+                                        android:textSize="@dimen/_10sdp"
+                                        tools:ignore="HardcodedText" />
+
+                                    <TextView
+                                        android:id="@+id/textNama"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:text="-"
+                                        android:textColor="#000"
+                                        android:textSize="@dimen/_12sdp"
+                                        tools:ignore="HardcodedText" />
+
+                                </LinearLayout>
+
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginVertical="@dimen/_5sdp"
+                                android:gravity="top|center"
+                                android:orientation="horizontal">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center"
+                                    android:orientation="vertical">
+
+                                    <TextView
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:text="Shift"
+                                        android:textColor="#666"
+                                        android:textSize="@dimen/_10sdp"
+                                        tools:ignore="HardcodedText" />
+
+                                    <TextView
+                                        android:id="@+id/textShift"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:text="-"
+                                        android:textColor="#000"
+                                        android:textSize="@dimen/_12sdp"
+                                        tools:ignore="HardcodedText" />
+
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center"
+                                    android:orientation="vertical">
+
+                                    <TextView
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:text="Departemen"
+                                        android:textColor="#666"
+                                        android:textSize="@dimen/_10sdp"
+                                        tools:ignore="HardcodedText" />
+
+                                    <TextView
+                                        android:id="@+id/textDepartemen"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:text="-"
+                                        android:textColor="#000"
+                                        android:textSize="@dimen/_12sdp"
+                                        tools:ignore="HardcodedText" />
+
+                                </LinearLayout>
+
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginVertical="@dimen/_5sdp"
+                                android:gravity="top|center"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="Jenis Pengajuan"
+                                    android:textAlignment="center"
+                                    android:textColor="#666"
+                                    android:textSize="@dimen/_10sdp"
+                                    tools:ignore="HardcodedText" />
+
+                                <TextView
+                                    android:id="@+id/textType"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="-"
+                                    android:textAlignment="center"
+                                    android:textColor="@android:color/holo_red_light"
+                                    android:textSize="@dimen/_14sdp"
+                                    tools:ignore="HardcodedText" />
+
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginVertical="@dimen/_10sdp"
+                                android:gravity="top|center"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="Detail Keterangan"
+                                    android:textAlignment="center"
+                                    android:textColor="#666"
+                                    android:textSize="@dimen/_10sdp"
+                                    tools:ignore="HardcodedText" />
+
+                                <TextView
+                                    android:id="@+id/textDetail"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="-"
+                                    android:textAlignment="center"
+                                    android:textColor="#000"
+                                    android:textSize="@dimen/_12sdp"
+                                    tools:ignore="HardcodedText" />
+
+                                <pl.droidsonroids.gif.GifImageView
+                                    android:id="@+id/iconStatus"
+                                    android:layout_width="@dimen/_50sdp"
+                                    android:layout_height="@dimen/_50sdp"
+                                    android:layout_marginTop="@dimen/_10sdp"
+                                    android:src="@drawable/ic_success" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                    </androidx.cardview.widget.CardView>
+
+                </LinearLayout>
+
+                <ImageButton
+                    android:id="@+id/btnDownload"
+                    android:layout_width="@dimen/_200sdp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/_10sdp"
+                    android:adjustViewBounds="true"
+                    android:background="@android:color/transparent"
+                    android:scaleType="fitStart"
+                    android:src="@drawable/bg_btn_download"
+                    android:visibility="gone"
+                    tools:ignore="ContentDescription,HardcodedText" />
+
+                <ImageButton
+                    android:id="@+id/btnShare"
+                    android:layout_width="@dimen/_200sdp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/_10sdp"
+                    android:adjustViewBounds="true"
+                    android:background="@android:color/transparent"
+                    android:scaleType="fitStart"
+                    android:src="@drawable/bg_btn_share"
+                    tools:ignore="ContentDescription,HardcodedText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/my_izin_form"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginBottom="@dimen/_50sdp"
+                android:gravity="top|center"
+                android:orientation="vertical">
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/_15sdp"
+                    android:layout_marginHorizontal="@dimen/_15sdp"
+                    app:cardBackgroundColor="#FFF"
+                    app:cardCornerRadius="@dimen/_15sdp"
+                    app:cardUseCompatPadding="false">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="@dimen/_10sdp"
+                        android:gravity="top|center"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="@dimen/_12sdp"
+                            android:text="Jenis Pengajuan"
+                            android:textColor="#000"
+                            tools:ignore="HardcodedText" />
+
+                        <RadioGroup
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <RadioButton
+                                android:id="@+id/btnJenis1"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:checked="true"
+                                android:text="Izin" />
+
+                            <RadioButton
+                                android:id="@+id/btnJenis2"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:checked="false"
+                                android:text="Sakit" />
+
+                            <RadioButton
+                                android:id="@+id/btnJenis3"
+                                android:layout_width="@dimen/_40sdp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:checked="false"
+                                android:text="Emergency" />
+
+                        </RadioGroup>
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/_15sdp"
+                    android:layout_marginHorizontal="@dimen/_15sdp"
+                    app:cardBackgroundColor="#FFF"
+                    app:cardCornerRadius="@dimen/_15sdp"
+                    app:cardUseCompatPadding="false">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="@dimen/_10sdp"
+                        android:gravity="top|center"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="@dimen/_12sdp"
+                            android:text="Nomor Hp / Whatsapp Aktif"
+                            android:textColor="#000"
+                            tools:ignore="HardcodedText" />
+
+                        <EditText
+                            android:id="@+id/textPhone"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:autofillHints=""
+                            android:hint=""
+                            android:inputType="number"
+                            tools:ignore="HardcodedText" />
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/_15sdp"
+                    android:layout_marginHorizontal="@dimen/_15sdp"
+                    app:cardBackgroundColor="#FFF"
+                    app:cardCornerRadius="@dimen/_15sdp"
+                    app:cardUseCompatPadding="false">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="@dimen/_10sdp"
+                        android:gravity="top|center"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="@dimen/_12sdp"
+                            android:text="Detail Keterangan"
+                            android:textColor="#000"
+                            tools:ignore="HardcodedText" />
+
+                        <EditText
+                            android:id="@+id/textNote"
+                            android:layout_width="match_parent"
+                            android:layout_height="@dimen/_100sdp"
+                            android:autofillHints=""
+                            android:hint=""
+                            android:inputType="textMultiLine"
+                            android:gravity="top"
+                            tools:ignore="HardcodedText" />
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <Button
+                    android:id="@+id/btnSubmit"
+                    android:layout_width="@dimen/_170sdp"
+                    android:layout_height="wrap_content"
+                    android:padding="@dimen/_5sdp"
+                    android:text="Submit"
+                    android:textSize="@dimen/_14sdp"
+                    android:backgroundTint="@drawable/bg_button"
+                    android:layout_marginTop="@dimen/_20sdp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question
+    url: https://savera_api.ungguldinamika.com/docs
+    about: If you just have a question, please check the Savera API documentation first.
+  - name: Website
+    url: https://savera_api.ungguldinamika.com/docs
+    about: Visit Savera API documentation for integration details and troubleshooting.
+  - name: See supported gadgets
+    url: https://codeberg.org/Freeyourgadget/Saverawatch
+    about: See current Saverawatch source and supported integrations.
