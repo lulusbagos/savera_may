@@ -62,10 +62,8 @@ public class MyZonaPintar extends Fragment {
         if (!localStorage.getEmployee().isEmpty() && !localStorage.getEmployee().isBlank()) {
             try {
                 JSONObject jsonEmployee = new JSONObject(localStorage.getEmployee());
-                if (jsonEmployee.has("id") && !jsonEmployee.getString("id").equals("null")) {
-                    companyId = jsonEmployee.getInt("company_id");
-                    employeeId = jsonEmployee.getInt("id");
-                }
+                companyId = jsonEmployee.optInt("company_id", 0);
+                employeeId = jsonEmployee.optInt("id", 0);
             } catch (JSONException e) {
                 LOG.error("Error parsing employee data", e);
             }
@@ -99,6 +97,13 @@ public class MyZonaPintar extends Fragment {
         progress.setVisibility(View.VISIBLE);
         emptyState.setVisibility(View.GONE);
         recyclerView.setVisibility(View.GONE);
+
+        if (companyId <= 0 || employeeId <= 0) {
+            LOG.warn("Skipping articles load: invalid employee context companyId={} employeeId={}", companyId, employeeId);
+            progress.setVisibility(View.GONE);
+            showEmptyState();
+            return;
+        }
 
         // API endpoint: /api/articles?company_id=X&employee_id=Y&type=Zona+Operator+Pintar
         String url = getString(R.string.base_url) + "/articles?company_id=" + companyId + "&employee_id=" + employeeId + "&type=Zona+Operator+Pintar";

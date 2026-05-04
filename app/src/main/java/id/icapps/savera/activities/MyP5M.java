@@ -164,6 +164,12 @@ public class MyP5M extends Fragment {
             return;
         }
 
+        if (companyId <= 0 || employeeId <= 0) {
+            requestRunning.set(false);
+            bindMissingContext();
+            return;
+        }
+
         bindLoadingState(true);
         String url = getString(R.string.base_url) + "/p5m";
         Context context = getContext();

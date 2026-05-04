@@ -5,6 +5,7 @@ import static id.icapps.savera.util.GB.toast;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.text.method.LinkMovementMethod;
 import android.text.Spanned;
 import android.view.View;
 import android.widget.ImageButton;
@@ -191,9 +192,11 @@ public class NotificationActivity extends AppCompatActivity {
         card.addView(date);
 
         TextView body = new TextView(this);
-        body.setText(renderHtml(row.optString("message_html", "")));
+        body.setText(renderHtml(resolveNotificationBodyHtml(row)));
         body.setTextSize(12);
         body.setTextColor(Color.parseColor("#2E2E2E"));
+        body.setAutoLinkMask(android.text.util.Linkify.WEB_URLS);
+        body.setMovementMethod(LinkMovementMethod.getInstance());
         LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -266,6 +269,20 @@ public class NotificationActivity extends AppCompatActivity {
     private Spanned renderHtml(String html) {
         String safeHtml = (html == null || html.isBlank()) ? "<p>-</p>" : html;
         return HtmlCompat.fromHtml(safeHtml, HtmlCompat.FROM_HTML_MODE_LEGACY);
+    }
+
+    private String resolveNotificationBodyHtml(JSONObject row) {
+        String html = row.optString("message_html", "").trim();
+        if (!html.isEmpty()) {
+            return html;
+        }
+
+        String plain = row.optString("message", "").trim();
+        if (!plain.isEmpty()) {
+            return "<p>" + plain + "</p>";
+        }
+
+        return "<p>-</p>";
     }
 
     private String formatDate(String isoDate) {

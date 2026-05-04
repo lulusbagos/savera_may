@@ -565,6 +565,11 @@ public class MyDashboard extends Fragment {
     }
 
     private void syncEmployeeContextFromLocalStorage() {
+        textNama.setText("-");
+        textNik.setText("-");
+        textDepartemen.setText("-");
+        textMess.setText("-");
+
         String employeeJson = localStorage.getEmployee();
         if (employeeJson.isEmpty() || employeeJson.isBlank()) {
             return;
@@ -609,6 +614,25 @@ public class MyDashboard extends Fragment {
         }
 
         return normalized;
+    }
+
+    private String extractApiMessage(String responseBody, String fallback) {
+        if (responseBody == null) {
+            return fallback;
+        }
+
+        String normalizedBody = responseBody.trim();
+        if (normalizedBody.isEmpty()) {
+            return fallback;
+        }
+
+        try {
+            JSONObject response = new JSONObject(normalizedBody);
+            String message = response.optString("message", "").trim();
+            return message.isEmpty() ? fallback : message;
+        } catch (JSONException ignored) {
+            return fallback;
+        }
     }
 
     private void showNotificationBadge(int unreadCount) {
@@ -840,7 +864,7 @@ public class MyDashboard extends Fragment {
                                 if (code == 200) {
                                     try {
                                         JSONObject response = new JSONObject(http.getResponse());
-                                        deviceId = response.getInt("id");
+                                        deviceId = response.optInt("id", 0);
                                         if (response.has("employee") && !response.get("employee").toString().equals("null")) {
                                             JSONObject jsonEmployee = new JSONObject(response.get("employee").toString());
                                             String fullName = getEmployeeField(jsonEmployee, "fullname", "-");
@@ -854,10 +878,10 @@ public class MyDashboard extends Fragment {
                                             textNik.setText(employeeCode);
                                             textDepartemen.setText(departmentName);
                                             textMess.setText(messName);
-                                            employeeId = jsonEmployee.getInt("id");
+                                            employeeId = jsonEmployee.optInt("id", employeeId);
                                             userId = jsonEmployee.optInt("user_id", userId);
-                                            companyId = jsonEmployee.getInt("company_id");
-                                            departmentId = jsonEmployee.getInt("department_id");
+                                            companyId = jsonEmployee.optInt("company_id", companyId);
+                                            departmentId = jsonEmployee.optInt("department_id", departmentId);
                                             if (!profilePhoto.isEmpty()) {
                                                 employeePhoto = profilePhoto;
                                             }
@@ -871,21 +895,16 @@ public class MyDashboard extends Fragment {
                                             if (jsonShift == null) {
                                                 jsonShift = new JSONObject(response.get("shift").toString());
                                             }
-                                            shiftId = jsonShift.getInt("id");
+                                            shiftId = jsonShift.optInt("id", shiftId);
                                         }
                                         localStorage.markUserContextSynced();
                                         draw();
                                     } catch (JSONException e) {
-                                        e.printStackTrace();
+                                        LOG.warn("Failed parsing device payload", e);
                                     }
                                 } else if (code == 422 || code == 401 || code == 404) {
-                                    try {
-                                        JSONObject response = new JSONObject(http.getResponse());
-                                        String msg = response.getString("message");
-                                        toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
-                                    } catch (JSONException e) {
-                                        e.printStackTrace();
-                                    }
+                                    String msg = extractApiMessage(http.getResponse(), "Gagal mengambil data device.");
+                                    toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
                                 } else {
                                     toast(requireActivity(), "Error get device registration auth key", Toast.LENGTH_SHORT, GB.ERROR);
                                     assert getActivity() != null;
@@ -942,13 +961,8 @@ public class MyDashboard extends Fragment {
                                 bannerLayout.setVisibility(View.GONE);
                                 LOG.warn("Banner endpoint not available (404), hiding banner section");
                             } else if (code == 422 || code == 401) {
-                                try {
-                                    JSONObject response = new JSONObject(http.getResponse());
-                                    String msg = response.getString("message");
-                                    toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
-                                } catch (JSONException e) {
-                                    e.printStackTrace();
-                                }
+                                String msg = extractApiMessage(http.getResponse(), "Gagal mengambil banner.");
+                                toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
                             } else {
                                 toast(requireActivity(), "Error get banner", Toast.LENGTH_SHORT, GB.ERROR);
                             }
@@ -986,8 +1000,14 @@ public class MyDashboard extends Fragment {
                 float intensity = row.getProvider() != null ? row.getIntensity() : ActivitySample.NOT_MEASURED;
                 int rawIntensity = row.getProvider() != null ? row.getRawIntensity() : ActivitySample.NOT_MEASURED;
 
-                String[] provider1 = row.getProvider().toString().split("\\.");
-                String[] provider2 = provider1[provider1.length - 1].toString().split("@");
+                String providerName = "unknown";
+                Object provider = row.getProvider();
+                if (provider != null) {
+                    String[] provider1 = provider.toString().split("\\.");
+                    String providerTail = provider1[provider1.length - 1];
+                    String[] provider2 = providerTail.split("@");
+                    providerName = provider2[0];
+                }
 
                 JSONObject obj = new JSONObject();
                 obj.put("timestamp", row.getTimestamp());
@@ -1000,7 +1020,7 @@ public class MyDashboard extends Fragment {
                 obj.put("activeCalories", row.getActiveCalories());
                 int hr = row.getHeartRate();
                 obj.put("heartRate", hr);
-                obj.put("provider", provider2[0]);
+                obj.put("provider", providerName);
                 jsonActivity.put(obj);
 
                 // Extract stress and spo2 into separate arrays (not embedded in activity)
@@ -1332,13 +1352,8 @@ public class MyDashboard extends Fragment {
                             e.printStackTrace();
                         }
                     } else if (code == 422 || code == 401 || code == 404) {
-                        try {
-                            JSONObject response = new JSONObject(http.getResponse());
-                            String msg = response.getString("message");
-                            toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
+                        String msg = extractApiMessage(http.getResponse(), "Gagal mengirim detail aktivitas.");
+                        toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
                         showUploadProgressOverlay(false);
                         btnSync.setEnabled(true);
                         loading.setVisibility(View.GONE);
@@ -1364,22 +1379,32 @@ public class MyDashboard extends Fragment {
     }
 
     private void sendFitToWork() {
-        if (lastSummaryId <= 0) {
-            return;
-        }
-
         Context context = getContext();
         if (context == null) {
             return;
         }
 
-        String url = getString(R.string.base_url) + "/fit-to-work";
+        String url = getString(R.string.base_url) + "/mobile/fit-to-work";
         JSONObject params = new JSONObject();
         try {
-            params.put("summary_id", lastSummaryId);
+            if (lastSummaryId > 0) {
+                params.put("summary_id", lastSummaryId);
+            } else {
+                if (userId > 0) {
+                    params.put("user_id", userId);
+                }
+                if (employeeId > 0) {
+                    params.put("employee_id", employeeId);
+                }
+                if (companyId > 0) {
+                    params.put("company_id", companyId);
+                }
+                params.put("send_date", new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date()));
+            }
             params.put("fit_to_work_q1", isFit1);
             params.put("fit_to_work_q2", isFit2);
             params.put("fit_to_work_q3", isFit3);
+            params.put("fit_to_work_submitted_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT).format(new Date()));
         } catch (JSONException e) {
             LOG.warn("Failed building fit-to-work payload", e);
             return;
@@ -1496,7 +1521,7 @@ public class MyDashboard extends Fragment {
         }
         
         // Validate P5M (skip for developer mode as it's auto-set)
-        if (!isDeveloperMode() && !Objects.equals(localStorage.getP5M(), textNik.getText() + "_" + textDate.getText())) {
+        if (!isDeveloperMode() && !hasP5MSubmissionForToday()) {
             showUploadProgressOverlay(false);
             toast(requireActivity(), "Anda belum mengisi P5M!", Toast.LENGTH_SHORT, GB.ERROR);
             new Handler().postDelayed(new Runnable() {
@@ -1510,6 +1535,9 @@ public class MyDashboard extends Fragment {
         }
 
         // All validations passed, proceed with upload
+        adaptUploadRouteForCurrentNetwork();
+        sendNetworkReport(deviceToUse);
+
         btnSync.setEnabled(false);
         loading.setVisibility(View.VISIBLE);
 
@@ -1578,6 +1606,12 @@ public class MyDashboard extends Fragment {
                         try {
                                JSONObject summaryResp = new JSONObject(http.getResponse());
                                lastSummaryId = summaryResp.optInt("id", summaryResp.optInt("summary_id", 0));
+                               if (lastSummaryId <= 0) {
+                                   JSONObject summaryData = summaryResp.optJSONObject("data");
+                                   if (summaryData != null) {
+                                       lastSummaryId = summaryData.optInt("summary_id", summaryData.optInt("id", 0));
+                                   }
+                               }
                             toast(requireActivity(), "Success send activity summary", Toast.LENGTH_SHORT, GB.INFO);
                             updateUploadProgress("Summary terkirim, mengirim detail...", 1, 2);
                             sendDetail(device, detailData, false, true);
@@ -1588,13 +1622,8 @@ public class MyDashboard extends Fragment {
                             loading.setVisibility(View.GONE);
                         }
                     } else if (code == 422 || code == 401 || code == 404) {
-                        try {
-                            JSONObject response = new JSONObject(http.getResponse());
-                            String msg = response.getString("message");
-                            toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
-                        } catch (JSONException e) {
-                            LOG.warn("Failed parsing summary error response", e);
-                        }
+                        String msg = extractApiMessage(http.getResponse(), "Gagal mengirim ringkasan aktivitas.");
+                        toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
                         showUploadProgressOverlay(false);
                         btnSync.setEnabled(true);
                         loading.setVisibility(View.GONE);
@@ -2216,6 +2245,53 @@ public class MyDashboard extends Fragment {
         return params.toString();
     }
 
+    private boolean hasP5MSubmissionForToday() {
+        String todayMarker = String.valueOf(textNik.getText()) + "_" + textDate.getText();
+        if (Objects.equals(localStorage.getP5M(), todayMarker)) {
+            return true;
+        }
+
+        String cachedAnswers = localStorage.getP5MAnswers();
+        if (cachedAnswers == null || cachedAnswers.isBlank()) {
+            return false;
+        }
+
+        try {
+            JSONObject payload = new JSONObject(cachedAnswers);
+            String submittedAt = payload.optString("submitted_at", "");
+            JSONArray answers = payload.optJSONArray("answers");
+            if (answers == null || answers.length() == 0 || submittedAt.isEmpty()) {
+                return false;
+            }
+
+            String submittedDate = submittedAt.length() >= 10 ? submittedAt.substring(0, 10) : submittedAt;
+            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(System.currentTimeMillis());
+            return today.equals(submittedDate);
+        } catch (JSONException e) {
+            LOG.warn("Failed parsing cached P5M answers", e);
+            return false;
+        }
+    }
+
+    private void adaptUploadRouteForCurrentNetwork() {
+        Context context = getContext();
+        if (context == null || localStorage == null) {
+            return;
+        }
+
+        String publicBaseUrl = localStorage.getApiPublicUrl();
+        if (publicBaseUrl.isEmpty()) {
+            return;
+        }
+
+        String networkType = getNetworkType(context);
+        boolean metered = isActiveNetworkMetered(context);
+        if ("mobile".equalsIgnoreCase(networkType) || metered) {
+            localStorage.setApiPreferredRoute("public");
+            localStorage.setApiActiveBaseUrl(publicBaseUrl);
+        }
+    }
+
     private void sendNetworkReport(GBDevice device) {
         Context context = getContext();
         if (context == null) {
@@ -2231,6 +2307,9 @@ public class MyDashboard extends Fragment {
                 http.setMethod("post");
                 http.setToken(true);
                 http.setData(payload);
+                http.setConnectTimeoutMs(5000);
+                http.setReadTimeoutMs(7000);
+                http.setMaxAttempts(1);
                 http.send();
 
                 Integer code = http.getStatusCode();

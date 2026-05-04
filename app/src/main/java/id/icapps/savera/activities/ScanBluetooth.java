@@ -777,10 +777,11 @@ public class ScanBluetooth extends AbstractGBActivity implements AdapterView.OnI
                         } else if (code == 422 || code == 401 || code == 404) {
                             try {
                                 JSONObject response = new JSONObject(http.getResponse());
-                                String msg = response.getString("message");
+                                String msg = response.optString("message", "Gagal mengambil auth key device.");
                                 toast(ScanBluetooth.this, msg, Toast.LENGTH_SHORT, GB.ERROR);
                             } catch (JSONException e) {
-                                e.printStackTrace();
+                                LOG.warn("Failed parsing device auth key error response", e);
+                                toast(ScanBluetooth.this, "Gagal mengambil auth key device.", Toast.LENGTH_SHORT, GB.ERROR);
                             }
                         } else {
                             toast(ScanBluetooth.this, "Error get device registration auth key", Toast.LENGTH_SHORT, GB.ERROR);

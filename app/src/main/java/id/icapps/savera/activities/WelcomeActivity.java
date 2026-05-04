@@ -254,7 +254,8 @@ public class WelcomeActivity extends AppCompatActivity implements GBActivity {
             textVersion.setText("Versi " + info.versionName);
             localStorage.setVersion(info.versionName + " (Android)");
         } catch (PackageManager.NameNotFoundException e) {
-            throw new RuntimeException(e);
+            LOG.warn("Could not read app version", e);
+            textVersion.setText("Versi -");
         }
     }
 

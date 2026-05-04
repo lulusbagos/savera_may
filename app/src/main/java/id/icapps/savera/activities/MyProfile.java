@@ -98,11 +98,11 @@ public class MyProfile extends Fragment {
         textUploadQueueDetail = view.findViewById(R.id.textUploadQueueDetail);
 
         if (textLocalSyncStatus != null) {
-            textLocalSyncStatus.setVisibility(View.GONE);
+            textLocalSyncStatus.setVisibility(View.VISIBLE);
         }
 
         if (textLocalSyncDetail != null) {
-            textLocalSyncDetail.setVisibility(View.GONE);
+            textLocalSyncDetail.setVisibility(View.VISIBLE);
         }
         if (textUploadQueueStatus != null) {
             textUploadQueueStatus.setVisibility(View.GONE);
@@ -812,7 +812,7 @@ public class MyProfile extends Fragment {
                             } else if (code == 422 || code == 401 || code == 404) {
                                 try {
                                     JSONObject response = new JSONObject(http.getResponse());
-                                    String msg = response.getString("message");
+                                    String msg = response.optString("message", "Gagal mengambil profil user.");
 
                                     if (containsCompanyNotFound(msg) && companyIndex + 1 < companyCandidates.size()) {
                                         getProfile(bypassCache, companyCandidates, companyIndex + 1, true);
@@ -832,7 +832,8 @@ public class MyProfile extends Fragment {
 
                                     toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
                                 } catch (JSONException e) {
-                                    e.printStackTrace();
+                                    Log.e(TAG, "Failed parsing profile error response", e);
+                                    toast(requireActivity(), "Gagal mengambil profil user.", Toast.LENGTH_SHORT, GB.ERROR);
                                 }
                                 refreshNetworkSyncStatus();
                                 refreshUploadQueueStatus();
@@ -925,12 +926,8 @@ public class MyProfile extends Fragment {
             textNik.setText(getEmployeeField(jsonEmployee, "code", "-"));
             textDepartemen.setText(getEmployeeField(jsonEmployee, "department_name", "-"));
             textMess.setText(getEmployeeField(jsonEmployee, "mess_name", "-"));
-            if (jsonEmployee.has("company_id") && !jsonEmployee.getString("company_id").equals("null")) {
-                companyId = jsonEmployee.getInt("company_id");
-            }
-            if (jsonEmployee.has("id") && !jsonEmployee.getString("id").equals("null")) {
-                employeeId = jsonEmployee.getInt("id");
-            }
+            companyId = jsonEmployee.optInt("company_id", 0);
+            employeeId = jsonEmployee.optInt("id", 0);
             String profilePhoto = getEmployeeField(jsonEmployee, "photo", "");
             if (!profilePhoto.isEmpty()) {
                 employeePhoto = profilePhoto;
@@ -1060,9 +1057,55 @@ public class MyProfile extends Fragment {
             return;
         }
 
-        textLocalSyncStatus.setVisibility(View.GONE);
-        textLocalSyncDetail.setVisibility(View.GONE);
-        return;
+        String localUrl = sanitizeUrl(localStorage.getApiLocalUrl());
+        String activeUrl = sanitizeUrl(localStorage.getApiActiveBaseUrl());
+        String preferredRoute = localStorage.getApiPreferredRoute();
+        boolean hasLocalUrl = !localUrl.isEmpty();
+        boolean hasSyncedConfig = localStorage.hasSyncedApiConfig();
+        boolean activeLocal = hasLocalUrl && activeUrl.startsWith(localUrl);
+        boolean preferredLocal = "local".equalsIgnoreCase(preferredRoute);
+        boolean localSynced = hasLocalUrl && hasSyncedConfig && (activeLocal || preferredLocal);
+
+        textLocalSyncStatus.setVisibility(View.VISIBLE);
+        textLocalSyncDetail.setVisibility(View.VISIBLE);
+
+        if (localSynced) {
+            textLocalSyncStatus.setText(getString(R.string.profile_local_sync_ok));
+            textLocalSyncStatus.setBackgroundColor(Color.parseColor("#EAF7EE"));
+            textLocalSyncStatus.setTextColor(Color.parseColor("#1E6B3A"));
+
+            String activeLabel = activeUrl.isEmpty() ? "-" : activeUrl;
+            textLocalSyncDetail.setText(getString(R.string.profile_local_sync_detail, localUrl, activeLabel));
+            textLocalSyncDetail.setTextColor(Color.parseColor("#1E6B3A"));
+            return;
+        }
+
+        textLocalSyncStatus.setText(getString(R.string.profile_local_sync_not_ready));
+        textLocalSyncStatus.setBackgroundColor(Color.parseColor("#FDEDED"));
+        textLocalSyncStatus.setTextColor(Color.parseColor("#8A1C1C"));
+
+        if (!hasLocalUrl) {
+            textLocalSyncDetail.setText(getString(R.string.profile_local_sync_missing_local));
+        } else if (!hasSyncedConfig) {
+            textLocalSyncDetail.setText(getString(R.string.profile_local_sync_detail_unsynced));
+        } else {
+            String activeLabel = activeUrl.isEmpty() ? "-" : activeUrl;
+            textLocalSyncDetail.setText(getString(R.string.profile_local_sync_detail, localUrl, activeLabel));
+        }
+        textLocalSyncDetail.setTextColor(Color.parseColor("#8A1C1C"));
+    }
+
+    private String sanitizeUrl(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        String normalized = value.trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+
+        return normalized;
     }
 
     private boolean shouldRefreshProfileOnOpen() {

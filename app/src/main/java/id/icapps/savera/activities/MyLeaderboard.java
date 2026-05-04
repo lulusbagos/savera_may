@@ -68,8 +68,8 @@ public class MyLeaderboard extends Fragment {
     private LinearLayout listView;
     private ProgressBar listProgress;
     private LocalStorage localStorage;
-    private String employeeCode;
-    private String employeeName;
+    private String employeeCode = "";
+    private String employeeName = "";
     private final SimpleDateFormat keyDateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
     private final SimpleDateFormat labelDateFormat = new SimpleDateFormat("EEE, dd MMM", new Locale("id", "ID"));
 
@@ -97,14 +97,12 @@ public class MyLeaderboard extends Fragment {
         if (!localStorage.getEmployee().isEmpty() && !localStorage.getEmployee().isBlank()) {
             try {
                 JSONObject jsonEmployee = new JSONObject(localStorage.getEmployee());
-                if (jsonEmployee.has("code") && !jsonEmployee.getString("code").equals("null")) {
-                    employeeCode = jsonEmployee.getString("code");
-                }
-                if (jsonEmployee.has("fullname") && !jsonEmployee.getString("fullname").equals("null")) {
-                    employeeName = jsonEmployee.getString("fullname");
-                }
+                employeeCode = safeString(jsonEmployee, "code", "");
+                employeeName = safeString(jsonEmployee, "fullname", "");
             } catch (JSONException e) {
-                throw new RuntimeException(e);
+                LOG.warn("Failed to parse employee for leaderboard, continue with defaults", e);
+                employeeCode = "";
+                employeeName = "";
             }
         }
 
@@ -488,5 +486,23 @@ public class MyLeaderboard extends Fragment {
         canvas.drawColor(GBApplication.getWindowBackgroundColor(context));
         view.draw(canvas);
         return bitmap;
+    }
+
+    private String safeString(JSONObject object, String key, String fallback) {
+        if (object == null) {
+            return fallback;
+        }
+
+        String value = object.optString(key, fallback);
+        if (value == null) {
+            return fallback;
+        }
+
+        String normalized = value.trim();
+        if (normalized.isEmpty() || "null".equalsIgnoreCase(normalized)) {
+            return fallback;
+        }
+
+        return normalized;
     }
 }

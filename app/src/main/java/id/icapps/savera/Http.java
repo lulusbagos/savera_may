@@ -2,6 +2,8 @@ package id.icapps.savera;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -28,6 +30,7 @@ public class Http {
     private static final int MAX_ATTEMPTS = 3;
     private static final long RETRY_BACKOFF_BASE_MS = 750L;
     private static final long SLOW_PUBLIC_RESPONSE_MS = 4000L;
+    private static final long SLOW_LOCAL_RESPONSE_MS = 4500L;
     private static final String CACHE_PREFS = "STORAGE_HTTP_CACHE";
 
     Context context;
@@ -132,6 +135,8 @@ public class Http {
         }
 
         try {
+            String configuredPublicBaseUrl = sanitizeBaseUrl(this.localStorage.getApiPublicUrl());
+            String configuredLocalBaseUrl = sanitizeBaseUrl(this.localStorage.getApiLocalUrl());
             List<URL> candidateUrls;
             if (this.useEndpointResolver) {
                 candidateUrls = ApiEndpointResolver.candidateUrls(this.context, this.url);
@@ -230,6 +235,14 @@ public class Http {
                         }
                     } catch (IOException e) {
                         lastException = e;
+                        String candidateBaseUrl = ApiEndpointResolver.apiBaseUrl(candidateUrl);
+                        boolean localCandidateFailed = !configuredLocalBaseUrl.isEmpty()
+                                && configuredLocalBaseUrl.equalsIgnoreCase(candidateBaseUrl);
+                        boolean canFallbackToPublic = !configuredPublicBaseUrl.isEmpty();
+                        if (localCandidateFailed && canFallbackToPublic) {
+                            this.localStorage.setApiPreferredRoute("public");
+                            this.localStorage.setApiActiveBaseUrl(configuredPublicBaseUrl);
+                        }
                         if (attempt == this.maxAttempts) {
                             break;
                         }
@@ -409,9 +422,18 @@ public class Http {
 
         boolean requestSucceeded = this.statusCode != null && this.statusCode >= 200 && this.statusCode <= 299;
         boolean usedPublicRoute = !publicBaseUrl.isEmpty() && publicBaseUrl.equalsIgnoreCase(activeBaseUrl);
+        boolean usedLocalRoute = !localBaseUrl.isEmpty() && localBaseUrl.equalsIgnoreCase(activeBaseUrl);
         boolean hasLocalRoute = !localBaseUrl.isEmpty();
-        if (requestSucceeded && usedPublicRoute && hasLocalRoute && durationMs >= SLOW_PUBLIC_RESPONSE_MS) {
+        boolean hasPublicRoute = !publicBaseUrl.isEmpty();
+        boolean shouldPreferLocal = isWifiLikeNetwork();
+
+        if (requestSucceeded && usedPublicRoute && hasLocalRoute && shouldPreferLocal && durationMs >= SLOW_PUBLIC_RESPONSE_MS) {
             this.localStorage.setApiActiveBaseUrl(localBaseUrl);
+        }
+
+        if (requestSucceeded && usedLocalRoute && hasPublicRoute && durationMs >= SLOW_LOCAL_RESPONSE_MS) {
+            this.localStorage.setApiPreferredRoute("public");
+            this.localStorage.setApiActiveBaseUrl(publicBaseUrl);
         }
     }
 
@@ -426,6 +448,37 @@ public class Http {
             Thread.sleep(delay);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    private String sanitizeBaseUrl(String url) {
+        if (url == null) {
+            return "";
+        }
+
+        return url.trim().replaceAll("/+$", "");
+    }
+
+    private boolean isWifiLikeNetwork() {
+        if (context == null) {
+            return false;
+        }
+
+        try {
+            ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) {
+                return false;
+            }
+
+            NetworkInfo info = cm.getActiveNetworkInfo();
+            if (info == null || !info.isConnected()) {
+                return false;
+            }
+
+            int type = info.getType();
+            return type == ConnectivityManager.TYPE_WIFI || type == ConnectivityManager.TYPE_ETHERNET;
+        } catch (Exception ignored) {
+            return false;
         }
     }
 }

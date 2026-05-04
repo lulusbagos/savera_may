@@ -83,27 +83,24 @@ public class IzinActivity extends AppCompatActivity {
         my_izin_print = findViewById(R.id.my_izin_print);
 
         localStorage = new LocalStorage(IzinActivity.this);
+        textNama.setText("-");
+        textNik.setText("-");
+        textDepartemen.setText("-");
+        textShift.setText("-");
+        textDate.setText("-");
+        textPhone.setText("");
+        textNote.setText("");
         if (!localStorage.getEmployee().isEmpty() && !localStorage.getEmployee().isBlank()) {
             try {
                 JSONObject jsonEmployee = new JSONObject(localStorage.getEmployee());
-                if (jsonEmployee.has("fullname") && !jsonEmployee.getString("fullname").equals("null")) {
-                    textNama.setText(jsonEmployee.getString("fullname"));
-                }
-                if (jsonEmployee.has("code") && !jsonEmployee.getString("code").equals("null")) {
-                    textNik.setText(jsonEmployee.getString("code"));
-                }
-                if (jsonEmployee.has("department_name") && !jsonEmployee.getString("department_name").equals("null")) {
-                    textDepartemen.setText(jsonEmployee.getString("department_name"));
-                }
-                if (jsonEmployee.has("phone") && !jsonEmployee.getString("phone").equals("null")) {
-                    textPhone.setText(jsonEmployee.getString("phone").replaceAll("[^\\d.]", ""));
-                }
-                if (jsonEmployee.has("id") && !jsonEmployee.getString("id").equals("null")) {
-                    companyId = jsonEmployee.getInt("company_id");
-                    employeeId = jsonEmployee.getInt("id");
-                }
+                textNama.setText(getSafeText(jsonEmployee, "fullname", "-"));
+                textNik.setText(getSafeText(jsonEmployee, "code", "-"));
+                textDepartemen.setText(getSafeText(jsonEmployee, "department_name", "-"));
+                textPhone.setText(getSafeText(jsonEmployee, "phone", "").replaceAll("[^\\d.]", ""));
+                companyId = jsonEmployee.optInt("company_id", 0);
+                employeeId = jsonEmployee.optInt("id", 0);
             } catch (JSONException e) {
-                throw new RuntimeException(e);
+                LOG.warn("Failed to parse local employee context for izin", e);
             }
         }
 
@@ -155,6 +152,11 @@ public class IzinActivity extends AppCompatActivity {
     }
 
     private void submitIzin() {
+        if (employeeId <= 0) {
+            toast(IzinActivity.this, "Data employee belum sinkron.", Toast.LENGTH_SHORT, GB.ERROR);
+            return;
+        }
+
         btnOpen.setVisibility(View.GONE);
         my_izin_print.setVisibility(View.GONE);
         my_izin_print.setAlpha(0.0f);
@@ -223,16 +225,35 @@ public class IzinActivity extends AppCompatActivity {
                 } else if (code == 422 || code == 401 || code == 404) {
                     try {
                         JSONObject response = new JSONObject(http.getResponse());
-                        String msg = response.getString("message");
+                        String msg = response.optString("message", "Gagal mengirim izin.");
                         toast(IzinActivity.this, msg, Toast.LENGTH_SHORT, GB.ERROR);
                     } catch (JSONException e) {
-                        e.printStackTrace();
+                        LOG.warn("Failed parsing izin error response", e);
+                        toast(IzinActivity.this, "Gagal mengirim izin.", Toast.LENGTH_SHORT, GB.ERROR);
                     }
                 } else {
                     toast(IzinActivity.this, "Error get user izin", Toast.LENGTH_SHORT, GB.ERROR);
                 }
             });
         }).start();
+    }
+
+    private String getSafeText(JSONObject object, String key, String fallback) {
+        if (object == null) {
+            return fallback;
+        }
+
+        String value = object.optString(key, fallback);
+        if (value == null) {
+            return fallback;
+        }
+
+        String normalized = value.trim();
+        if (normalized.isEmpty() || "null".equalsIgnoreCase(normalized)) {
+            return fallback;
+        }
+
+        return normalized;
     }
 
     private void take_share_screenshot(Context context, boolean share) {

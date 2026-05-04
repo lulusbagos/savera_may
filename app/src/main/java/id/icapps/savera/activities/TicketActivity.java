@@ -87,24 +87,29 @@ public class TicketActivity extends AppCompatActivity {
         iconStatus = findViewById(R.id.iconStatus);
 
         localStorage = new LocalStorage(TicketActivity.this);
+        textNama.setText("-");
+        textNik.setText("-");
+        textDepartemen.setText("-");
+        textShift.setText("-");
+        textArea.setText("-");
+        textPit.setText("-");
+        textHauler.setText("-");
+        textLoader.setText("-");
+        textTransport.setText("-");
+        textDate.setText("-");
+        textTime.setText("-");
+        textSleep.setText("-");
+        textMessage.setText("-");
         if (!localStorage.getEmployee().isEmpty() && !localStorage.getEmployee().isBlank()) {
             try {
                 JSONObject jsonEmployee = new JSONObject(localStorage.getEmployee());
-                if (jsonEmployee.has("fullname") && !jsonEmployee.getString("fullname").equals("null")) {
-                    textNama.setText(jsonEmployee.getString("fullname"));
-                }
-                if (jsonEmployee.has("code") && !jsonEmployee.getString("code").equals("null")) {
-                    textNik.setText(jsonEmployee.getString("code"));
-                }
-                if (jsonEmployee.has("department_name") && !jsonEmployee.getString("department_name").equals("null")) {
-                    textDepartemen.setText(jsonEmployee.getString("department_name"));
-                }
-                if (jsonEmployee.has("id") && !jsonEmployee.getString("id").equals("null")) {
-                    companyId = jsonEmployee.getInt("company_id");
-                    employeeId = jsonEmployee.getInt("id");
-                }
+                textNama.setText(getSafeText(jsonEmployee, "fullname", "-"));
+                textNik.setText(getSafeText(jsonEmployee, "code", "-"));
+                textDepartemen.setText(getSafeText(jsonEmployee, "department_name", "-"));
+                companyId = jsonEmployee.optInt("company_id", 0);
+                employeeId = jsonEmployee.optInt("id", 0);
             } catch (JSONException e) {
-                throw new RuntimeException(e);
+                LOG.warn("Failed to parse local employee context for ticket", e);
             }
         }
 
@@ -183,6 +188,12 @@ public class TicketActivity extends AppCompatActivity {
             applyDeveloperDemoTicket();
             return;
         }
+        if (employeeId <= 0) {
+            textStatus.setText("Data employee belum sinkron");
+            textStatus.setTextColor(getResources().getColor(R.color.hrv_status_char_line_color));
+            applyTicketCode();
+            return;
+        }
 
         String url = getString(R.string.base_url) + "/ticket/" + employeeId;
 
@@ -256,16 +267,35 @@ public class TicketActivity extends AppCompatActivity {
                 } else if (code == 422 || code == 401 || code == 404) {
                     try {
                         JSONObject response = new JSONObject(http.getResponse());
-                        String msg = response.getString("message");
+                        String msg = response.optString("message", "Gagal memuat data ticket.");
                         toast(TicketActivity.this, msg, Toast.LENGTH_SHORT, GB.ERROR);
                     } catch (JSONException e) {
-                        e.printStackTrace();
+                        LOG.warn("Failed parsing ticket error response", e);
+                        toast(TicketActivity.this, "Gagal memuat data ticket.", Toast.LENGTH_SHORT, GB.ERROR);
                     }
                 } else {
                     toast(TicketActivity.this, "Error get user ticket", Toast.LENGTH_SHORT, GB.ERROR);
                 }
             });
         }).start();
+    }
+
+    private String getSafeText(JSONObject object, String key, String fallback) {
+        if (object == null) {
+            return fallback;
+        }
+
+        String value = object.optString(key, fallback);
+        if (value == null) {
+            return fallback;
+        }
+
+        String normalized = value.trim();
+        if (normalized.isEmpty() || "null".equalsIgnoreCase(normalized)) {
+            return fallback;
+        }
+
+        return normalized;
     }
 
     private void take_share_screenshot(Context context, boolean share) {
