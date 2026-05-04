@@ -91,7 +91,9 @@ public class LoginActivity extends AppCompatActivity {
             textVersion.setText("Versi " + info.versionName);
             localStorage.setVersion("Savera X " + info.versionName);
         } catch (PackageManager.NameNotFoundException e) {
-            throw new RuntimeException(e);
+            Log.w(TAG, "Could not read app version", e);
+            textVersion.setText("Versi -");
+            localStorage.setVersion("Savera X -");
         }
     }
 
@@ -257,7 +259,7 @@ public class LoginActivity extends AppCompatActivity {
                                 Log.e(TAG, "Error parsing login response", e);
                                 toast(LoginActivity.this, "Invalid server response", Toast.LENGTH_SHORT, GB.ERROR);
                             }
-                        } else if (code == 422 || code == 401 || code == 404) {
+                        } else if (code == 422 || code == 401 || code == 403 || code == 404) {
                             try {
                                 String response = http.getResponse();
                                 String msg = "Login failed (Error " + code + ")";
@@ -279,6 +281,15 @@ public class LoginActivity extends AppCompatActivity {
                                     Log.d(TAG, "Login rejected for raw username, retrying once with company prefix");
                                     sendLogin(companyIndex, true, false);
                                     return;
+                                }
+
+                                if (!Patterns.EMAIL_ADDRESS.matcher(user).matches() && containsInvalidCredentials(msg)) {
+                                    int nextCompanyIndex = companyIndex + 1;
+                                    if (nextCompanyIndex < companyCandidates.size()) {
+                                        Log.d(TAG, "Invalid credentials for company " + companyHeader + ", retrying with next company candidate");
+                                        sendLogin(nextCompanyIndex, false, allowCompanyPrefixRetry);
+                                        return;
+                                    }
                                 }
 
                                 toast(LoginActivity.this, msg, Toast.LENGTH_SHORT, GB.ERROR);
@@ -327,6 +338,9 @@ public class LoginActivity extends AppCompatActivity {
                 http.setCacheTtlSeconds(900);
                 http.setUseEndpointResolver(false);
                 http.setIncludeCompanyHeader(true);
+                if (selectedCompanyHeader != null && !selectedCompanyHeader.trim().isEmpty()) {
+                    http.setCompanyHeaderValue(selectedCompanyHeader.trim().toUpperCase(Locale.ROOT));
+                }
                 http.setConnectTimeoutMs(8000);
                 http.setReadTimeoutMs(12000);
                 http.setMaxAttempts(1);
@@ -393,7 +407,7 @@ public class LoginActivity extends AppCompatActivity {
                                 String response = http.getResponse();
                                 if (response != null && !response.isEmpty()) {
                                     JSONObject responseObj = new JSONObject(response);
-                                    String msg = responseObj.getString("message");
+                                    String msg = responseObj.optString("message", "Failed to get profile (Error " + code + ")");
                                     toast(LoginActivity.this, msg, Toast.LENGTH_SHORT, GB.ERROR);
                                 } else {
                                     toast(LoginActivity.this, "Failed to get profile (Error " + code + ")", Toast.LENGTH_SHORT, GB.ERROR);
@@ -448,17 +462,34 @@ public class LoginActivity extends AppCompatActivity {
             if (value == null) {
                 continue;
             }
-            resolved.add(value.trim());
+            String normalized = value.trim();
+            if (!normalized.isEmpty()) {
+                normalized = normalized.toUpperCase(Locale.ROOT);
+            }
+            resolved.add(normalized);
         }
         return resolved;
     }
 
     private String extractCompanyFromLoginResponse(JSONObject responseObj, String fallback) {
+        JSONObject companyObj = responseObj.optJSONObject("company");
+        if (companyObj != null) {
+            for (String key : new String[]{"code", "company_code", "tenant_code", "name"}) {
+                String value = companyObj.optString(key, "").trim();
+                if (!value.isEmpty()) {
+                    return value.toUpperCase(Locale.ROOT);
+                }
+            }
+        }
+
         String[] directKeys = new String[]{"company", "company_code", "tenant", "tenant_code"};
         for (String key : directKeys) {
-            String value = responseObj.optString(key, "").trim();
-            if (!value.isEmpty()) {
-                return value.toUpperCase(Locale.ROOT);
+            Object rawValue = responseObj.opt(key);
+            if (rawValue instanceof String) {
+                String value = ((String) rawValue).trim();
+                if (!value.isEmpty()) {
+                    return value.toUpperCase(Locale.ROOT);
+                }
             }
         }
 
@@ -490,6 +521,18 @@ public class LoginActivity extends AppCompatActivity {
             return false;
         }
         return message.toLowerCase(Locale.ROOT).contains("company not found");
+    }
+
+    private boolean containsInvalidCredentials(String message) {
+        if (message == null) {
+            return false;
+        }
+
+        String normalized = message.toLowerCase(Locale.ROOT);
+        return normalized.contains("incorrect username or password")
+                || normalized.contains("credentials do not match")
+                || normalized.contains("these credentials do not match")
+                || normalized.contains("invalid credentials");
     }
 
     private void applyProfileContext(JSONObject responseObj, String companyHeader) throws JSONException {
