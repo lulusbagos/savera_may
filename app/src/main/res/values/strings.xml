@@ -8,9 +8,9 @@
 
     <string name="base_url">https://savera_api.ungguldinamika.com/api</string>
     <string name="base_url_public">https://savera_api.ungguldinamika.com/api</string>
-    <string name="base_url_local">http://192.168.179.7:2026/api</string>
+    <string name="base_url_local">http://192.168.151.20:2026/api</string>
     <string name="base_url_preferred_route">public</string>
-    <string name="base_company">SAVERA</string>
+    <string name="base_company">UDU</string>
     <string name="profile_local_sync_ok">Local IP sinkron dengan backend</string>
     <string name="profile_local_sync_not_ready">Local IP belum sinkron</string>
     <string name="profile_local_sync_missing_local">Backend belum mengirim IP local</string>
