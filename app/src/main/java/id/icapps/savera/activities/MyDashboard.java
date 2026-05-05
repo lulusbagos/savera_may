@@ -833,8 +833,9 @@ public class MyDashboard extends Fragment {
     @SuppressLint("SetTextI18n")
     private void getDevice() {
         List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
-        if (devices.toArray().length > 0) {
-            textDevice.setText(": " + devices.get(0).getName());
+        GBDevice activeDevice = resolvePrimaryWearableDevice();
+        if (activeDevice != null) {
+            textDevice.setText(": " + activeDevice.getName());
             textOperator.setText(": -");
 
             employeeId = 0;
@@ -844,9 +845,9 @@ public class MyDashboard extends Fragment {
             shiftId = 0;
             deviceId = 0;
 
-                String macAddress = devices.get(0).getAddress() == null
+                String macAddress = activeDevice.getAddress() == null
                     ? ""
-                    : devices.get(0).getAddress().trim().toUpperCase(Locale.ROOT);
+                    : activeDevice.getAddress().trim().toUpperCase(Locale.ROOT);
                 String url = getString(R.string.base_url) + "/device/" + macAddress;
 
             new Thread(new Runnable() {
@@ -889,7 +890,7 @@ public class MyDashboard extends Fragment {
                                             if (!profilePhoto.isEmpty()) {
                                                 employeePhoto = profilePhoto;
                                             }
-                                            devices.get(0).setAlias(fullName);
+                                            activeDevice.setAlias(fullName);
                                             localStorage.setEmployee(response.get("employee").toString());
 
                                             showImage();
@@ -922,6 +923,45 @@ public class MyDashboard extends Fragment {
         } else {
             toast(requireActivity(), "Device not found", Toast.LENGTH_SHORT, GB.ERROR);
         }
+    }
+
+    private GBDevice resolvePrimaryWearableDevice() {
+        List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
+        GBDevice selectedInitialized = null;
+        GBDevice anyInitialized = null;
+        GBDevice selectedTracking = null;
+
+        for (GBDevice device : devices) {
+            if (device == null || device.getDeviceCoordinator() == null) {
+                continue;
+            }
+
+            boolean selected = myData1.showAllDevices
+                    || myData1.showDeviceList == null
+                    || myData1.showDeviceList.contains(device.getAddress());
+            boolean supportsActivity = device.getDeviceCoordinator().supportsActivityTracking();
+
+            if (selected && supportsActivity && device.getState() == GBDevice.State.INITIALIZED) {
+                selectedInitialized = device;
+                break;
+            }
+
+            if (anyInitialized == null && device.getState() == GBDevice.State.INITIALIZED) {
+                anyInitialized = device;
+            }
+
+            if (selectedTracking == null && selected && supportsActivity) {
+                selectedTracking = device;
+            }
+        }
+
+        if (selectedInitialized != null) {
+            return selectedInitialized;
+        }
+        if (anyInitialized != null) {
+            return anyInitialized;
+        }
+        return selectedTracking;
     }
 
     private void getBanner(View view) {
@@ -1506,13 +1546,7 @@ public class MyDashboard extends Fragment {
         long currentTime = Calendar.getInstance().getTimeInMillis() / 1000;
         boolean dayIsToday = !(myData1.timeTo < currentTime);
 
-        GBDevice deviceToUse = null;
-        for (GBDevice device : GBApplication.app().getDeviceManager().getDevices()) {
-            if (device.getState() == GBDevice.State.INITIALIZED) {
-                deviceToUse = device;
-                break;
-            }
-        }
+        GBDevice deviceToUse = resolvePrimaryWearableDevice();
 
         if (deviceToUse == null && isDeveloperMode()) {
             // Developer mode: create dummy device for testing
@@ -2519,18 +2553,7 @@ public class MyDashboard extends Fragment {
     }
 
     private GBDevice firstSnapshotDevice() {
-        List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
-        for (GBDevice device : devices) {
-            if (device == null || device.getDeviceCoordinator() == null) {
-                continue;
-            }
-            boolean selected = myData1.showAllDevices
-                    || (myData1.showDeviceList != null && myData1.showDeviceList.contains(device.getAddress()));
-            if (selected && device.getDeviceCoordinator().supportsActivityTracking()) {
-                return device;
-            }
-        }
-        return null;
+        return resolvePrimaryWearableDevice();
     }
 
     private String buildSleepSnapshotPayload(
@@ -3139,9 +3162,10 @@ public class MyDashboard extends Fragment {
         btnReload.startAnimation(anim);
 
         List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
-        if (devices.toArray().length > 0) {
-            if (!devices.get(0).isConnected()) {
-                GBApplication.deviceService(devices.get(0)).connect();
+        GBDevice activeDevice = resolvePrimaryWearableDevice();
+        if (activeDevice != null) {
+            if (!activeDevice.isConnected()) {
+                GBApplication.deviceService(activeDevice).connect();
             }
             Calendar today = GregorianCalendar.getInstance();
             now = (Calendar) today.clone();
@@ -3532,17 +3556,54 @@ public class MyDashboard extends Fragment {
             return DailyTotals.getDailyTotalsForDevice(device, today, db);
         }
 
+        private boolean isSelectedDevice(GBDevice device) {
+            return device != null
+                    && (showAllDevices || showDeviceList == null || showDeviceList.contains(device.getAddress()));
+        }
+
+        private GBDevice getPrimaryActivityDevice(List<GBDevice> devices) {
+            GBDevice selectedInitialized = null;
+            GBDevice anyInitialized = null;
+            GBDevice selectedTracking = null;
+
+            for (GBDevice dev : devices) {
+                if (dev == null || dev.getDeviceCoordinator() == null) {
+                    continue;
+                }
+
+                boolean selected = isSelectedDevice(dev);
+                boolean supportsActivity = dev.getDeviceCoordinator().supportsActivityTracking();
+
+                if (selected && supportsActivity && dev.getState() == GBDevice.State.INITIALIZED) {
+                    selectedInitialized = dev;
+                    break;
+                }
+
+                if (anyInitialized == null && supportsActivity && dev.getState() == GBDevice.State.INITIALIZED) {
+                    anyInitialized = dev;
+                }
+
+                if (selectedTracking == null && selected && supportsActivity) {
+                    selectedTracking = dev;
+                }
+            }
+
+            if (selectedInitialized != null) {
+                return selectedInitialized;
+            }
+            if (anyInitialized != null) {
+                return anyInitialized;
+            }
+            return selectedTracking;
+        }
+
         private int getStepsTotal() {
             List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
             int totalSteps = 0;
             try (DBHandler dbHandler = GBApplication.acquireDB()) {
-                int idx = 0;
-                for (GBDevice dev : devices) {
-                    if (idx > 0) continue;
-                    idx++;
-                    if ((showAllDevices || showDeviceList.contains(dev.getAddress())) && dev.getDeviceCoordinator().supportsActivityTracking()) {
-                        totalSteps += (int) getDailyTotals(dev, dbHandler).getSteps();
-                    }
+                GBDevice dev = getPrimaryActivityDevice(devices);
+                if (dev != null) {
+                    totalSteps += (int) getDailyTotals(dev, dbHandler).getSteps();
                 }
             } catch (Exception e) {
                 LOG.warn("Could not calculate total amount of steps: ", e);
@@ -3662,21 +3723,17 @@ public class MyDashboard extends Fragment {
             sleepYesterday = 0;
             sleepRest = 0;
             try (DBHandler dbHandler = GBApplication.acquireDB()) {
-                int idx = 0;
-                for (GBDevice dev : devices) {
-                    if (idx > 0) continue;
-                    idx++;
-                    if ((showAllDevices || showDeviceList.contains(dev.getAddress())) && dev.getDeviceCoordinator().supportsActivityTracking()) {
-                        long[] sleep = getSleep(dev, dbHandler);
-                        sleepTotalMinutes += (sleep[0] + sleep[1] + sleep[2] + sleep[6]);
-                        lightSleepTotalMinutes += sleep[0];
-                        deepSleepTotalMinutes += sleep[1];
-                        remSleepTotalMinutes += sleep[2];
-                        awakeSleepTotalMinutes += sleep[3];
-                        sleepToday += sleep[4];
-                        sleepYesterday += sleep[5];
-                        sleepRest += sleep[6];
-                    }
+                GBDevice dev = getPrimaryActivityDevice(devices);
+                if (dev != null) {
+                    long[] sleep = getSleep(dev, dbHandler);
+                    sleepTotalMinutes += (sleep[0] + sleep[1] + sleep[2] + sleep[6]);
+                    lightSleepTotalMinutes += sleep[0];
+                    deepSleepTotalMinutes += sleep[1];
+                    remSleepTotalMinutes += sleep[2];
+                    awakeSleepTotalMinutes += sleep[3];
+                    sleepToday += sleep[4];
+                    sleepYesterday += sleep[5];
+                    sleepRest += sleep[6];
                 }
             } catch (Exception e) {
                 LOG.warn("Could not calculate total amount of sleep: ", e);
@@ -3700,17 +3757,13 @@ public class MyDashboard extends Fragment {
             List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
             long totalDistanceCm = 0;
             try (DBHandler dbHandler = GBApplication.acquireDB()) {
-                int idx = 0;
-                for (GBDevice dev : devices) {
-                    if (idx > 0) continue;
-                    idx++;
-                    if ((showAllDevices || showDeviceList.contains(dev.getAddress())) && dev.getDeviceCoordinator().supportsActivityTracking()) {
-                        final DailyTotals dailyTotals = getDailyTotals(dev, dbHandler);
-                        if (dailyTotals.getSteps() > 0 && dailyTotals.getDistance() > 0) {
-                            totalDistanceCm += dailyTotals.getDistance();
-                        } else {
-                            totalDistanceCm += dailyTotals.getSteps() * stepLength;
-                        }
+                GBDevice dev = getPrimaryActivityDevice(devices);
+                if (dev != null) {
+                    final DailyTotals dailyTotals = getDailyTotals(dev, dbHandler);
+                    if (dailyTotals.getSteps() > 0 && dailyTotals.getDistance() > 0) {
+                        totalDistanceCm += dailyTotals.getDistance();
+                    } else {
+                        totalDistanceCm += dailyTotals.getSteps() * stepLength;
                     }
                 }
             } catch (Exception e) {
@@ -3732,13 +3785,9 @@ public class MyDashboard extends Fragment {
             List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
             long totalActiveMinutes = 0;
             try (DBHandler dbHandler = GBApplication.acquireDB()) {
-                int idx = 0;
-                for (GBDevice dev : devices) {
-                    if (idx > 0) continue;
-                    idx++;
-                    if ((showAllDevices || showDeviceList.contains(dev.getAddress())) && dev.getDeviceCoordinator().supportsActivityTracking()) {
-                        totalActiveMinutes += getActiveMinutes(dev, dbHandler);
-                    }
+                GBDevice dev = getPrimaryActivityDevice(devices);
+                if (dev != null) {
+                    totalActiveMinutes += getActiveMinutes(dev, dbHandler);
                 }
             } catch (Exception e) {
                 LOG.warn("Could not calculate total amount of activity: ", e);
@@ -3777,19 +3826,16 @@ public class MyDashboard extends Fragment {
             List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
             heartRate = 0;
             try (DBHandler dbHandler = GBApplication.acquireDB()) {
-                int idx = 0;
-                for (GBDevice dev : devices) {
-                    if (idx > 0) continue;
-                    idx++;
-                    if ((showAllDevices || showDeviceList.contains(dev.getAddress())) && dev.getDeviceCoordinator().supportsActivityTracking()) {
-                        List<? extends ActivitySample> activitySamples = getAllSamples(dbHandler, dev);
-                        int hr = 0;
-                        for (ActivitySample row : activitySamples) {
-                            if (row.getHeartRate() > 0 && row.getHeartRate() < 255)
-                                hr = row.getHeartRate();
+                GBDevice dev = getPrimaryActivityDevice(devices);
+                if (dev != null) {
+                    List<? extends ActivitySample> activitySamples = getAllSamples(dbHandler, dev);
+                    int hr = 0;
+                    for (ActivitySample row : activitySamples) {
+                        if (row.getHeartRate() > 0 && row.getHeartRate() < 255) {
+                            hr = row.getHeartRate();
                         }
-                        heartRate += hr;
                     }
+                    heartRate += hr;
                 }
             } catch (Exception e) {
                 LOG.warn("Could not calculate total heart rate: ", e);
@@ -3806,21 +3852,19 @@ public class MyDashboard extends Fragment {
             List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
             stress = 0;
             try (DBHandler dbHandler = GBApplication.acquireDB()) {
-                int idx = 0;
-                for (GBDevice dev : devices) {
-                    if (idx > 0) continue;
-                    idx++;
-                    if ((showAllDevices || showDeviceList.contains(dev.getAddress())) && dev.getDeviceCoordinator().supportsActivityTracking()) {
-                        DeviceCoordinator coordinator = dev.getDeviceCoordinator();
-                        if (coordinator.supportsStressMeasurement()) {
-                            TimeSampleProvider<? extends StressSample> stressProvider = coordinator.getStressSampleProvider(dev, dbHandler.getDaoSession());
-                            List<? extends StressSample> stressSample = stressProvider.getAllSamples(timeFrom * 1000L, timeTo * 1000L);
-                            int strs = 0;
-                            for (StressSample row : stressSample) {
-                                if (row.getStress() > 0) strs = row.getStress();
+                GBDevice dev = getPrimaryActivityDevice(devices);
+                if (dev != null) {
+                    DeviceCoordinator coordinator = dev.getDeviceCoordinator();
+                    if (coordinator.supportsStressMeasurement()) {
+                        TimeSampleProvider<? extends StressSample> stressProvider = coordinator.getStressSampleProvider(dev, dbHandler.getDaoSession());
+                        List<? extends StressSample> stressSample = stressProvider.getAllSamples(timeFrom * 1000L, timeTo * 1000L);
+                        int strs = 0;
+                        for (StressSample row : stressSample) {
+                            if (row.getStress() > 0) {
+                                strs = row.getStress();
                             }
-                            stress += strs;
                         }
+                        stress += strs;
                     }
                 }
             } catch (Exception e) {
@@ -3848,21 +3892,19 @@ public class MyDashboard extends Fragment {
             List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
             bloodOxygen = 0;
             try (DBHandler dbHandler = GBApplication.acquireDB()) {
-                int idx = 0;
-                for (GBDevice dev : devices) {
-                    if (idx > 0) continue;
-                    idx++;
-                    if ((showAllDevices || showDeviceList.contains(dev.getAddress())) && dev.getDeviceCoordinator().supportsActivityTracking()) {
-                        DeviceCoordinator coordinator = dev.getDeviceCoordinator();
-                        if (coordinator.supportsSpo2(dev)) {
-                            TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(dev, dbHandler.getDaoSession());
-                            List<? extends Spo2Sample> spo2Sample = spo2Provider.getAllSamples(timeFrom * 1000L, timeTo * 1000L);
-                            int spo2 = 0;
-                            for (Spo2Sample row : spo2Sample) {
-                                if (row.getSpo2() > 0) spo2 = row.getSpo2();
+                GBDevice dev = getPrimaryActivityDevice(devices);
+                if (dev != null) {
+                    DeviceCoordinator coordinator = dev.getDeviceCoordinator();
+                    if (coordinator.supportsSpo2(dev)) {
+                        TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(dev, dbHandler.getDaoSession());
+                        List<? extends Spo2Sample> spo2Sample = spo2Provider.getAllSamples(timeFrom * 1000L, timeTo * 1000L);
+                        int spo2 = 0;
+                        for (Spo2Sample row : spo2Sample) {
+                            if (row.getSpo2() > 0) {
+                                spo2 = row.getSpo2();
                             }
-                            bloodOxygen += spo2;
                         }
+                        bloodOxygen += spo2;
                     }
                 }
             } catch (Exception e) {
