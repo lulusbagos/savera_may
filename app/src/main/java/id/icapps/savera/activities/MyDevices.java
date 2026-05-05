@@ -116,7 +116,7 @@ public class MyDevices extends Fragment {
         deviceListView.setLayoutManager(new LinearLayoutManager(view.getContext()));
 
         deviceList = deviceManager.getDevices();
-        myDeviceAdapter = new MyDeviceAdapter(view.getContext(), deviceList, deviceActivityHashMap, localStorage.getAdmin());
+        myDeviceAdapter = new MyDeviceAdapter(view.getContext(), deviceList, deviceActivityHashMap, canManageDevices());
         myDeviceAdapter.setHasStableIds(true);
 
         deviceListView.setAdapter(this.myDeviceAdapter);
@@ -180,7 +180,7 @@ public class MyDevices extends Fragment {
                 myDeviceAdapter = new MyDeviceAdapter(view.getContext(), deviceList.stream()
                         .filter(x -> x.getAliasOrName().toLowerCase().contains(s.toString().toLowerCase().trim()) ||
                                 x.getAddress().toLowerCase().replace(":", "").contains(s.toString().toLowerCase().trim()))
-                        .collect(Collectors.toList()), deviceActivityHashMap, localStorage.getAdmin());
+                        .collect(Collectors.toList()), deviceActivityHashMap, canManageDevices());
                 myDeviceAdapter.setHasStableIds(true);
                 deviceListView.setAdapter(myDeviceAdapter);
             }
@@ -249,12 +249,16 @@ public class MyDevices extends Fragment {
             deviceSearchPanel.setVisibility(View.GONE);
             btnAdd.setVisibility(View.GONE);
             textSearch.setVisibility(View.GONE);
-            if (localStorage.getAdmin()) {
+            if (canManageDevices()) {
                 deviceSearchPanel.setVisibility(View.VISIBLE);
                 btnAdd.setVisibility(View.VISIBLE);
                 textSearch.setVisibility(View.VISIBLE);
             }
         }
+    }
+
+    private boolean canManageDevices() {
+        return localStorage != null && (localStorage.getAdmin() || localStorage.getSleepUploader());
     }
 
     public RefreshTask createRefreshTask(String task, Context context, GBDevice device) {
