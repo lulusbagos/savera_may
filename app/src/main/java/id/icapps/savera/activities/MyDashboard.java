@@ -1366,7 +1366,9 @@ public class MyDashboard extends Fragment {
                             updateUploadProgress("Upload selesai!", 2, 2);
                             toast(requireActivity(), "Success send activity details", Toast.LENGTH_SHORT, GB.INFO);
                             refreshUploadNotificationState();
+                            if (!isSleepUploaderAccount()) {
                                 sendFitToWork();
+                            }
                             showUploadProgressOverlay(false);
                             btnSync.setEnabled(true);
                             loading.setVisibility(View.GONE);
@@ -1539,14 +1541,14 @@ public class MyDashboard extends Fragment {
         }
         
         // Validate fit to work (skip for developer mode as it's auto-set)
-        if (!isDeveloperMode() && (isFit1 < 0 || isFit2 < 0 || isFit3 < 0)) {
+        if (!isDeveloperMode() && !isSleepUploaderAccount() && (isFit1 < 0 || isFit2 < 0 || isFit3 < 0)) {
             showUploadProgressOverlay(false);
             toast(requireActivity(), "Fit to work harus diisi!", Toast.LENGTH_SHORT, GB.ERROR);
             return;
         }
         
         // Validate P5M (skip for developer mode as it's auto-set)
-        if (!isDeveloperMode() && !hasP5MSubmissionForToday()) {
+        if (!isDeveloperMode() && !isSleepUploaderAccount() && !hasP5MSubmissionForToday()) {
             showUploadProgressOverlay(false);
             toast(requireActivity(), "Anda belum mengisi P5M!", Toast.LENGTH_SHORT, GB.ERROR);
             new Handler().postDelayed(new Runnable() {
@@ -2267,6 +2269,45 @@ public class MyDashboard extends Fragment {
 
             return params.toString();
         }
+    }
+
+    private boolean isSleepUploaderAccount() {
+        if (localStorage == null) {
+            return false;
+        }
+
+        if (localStorage.getSleepUploader()) {
+            return true;
+        }
+
+        String employeeJson = localStorage.getEmployee();
+        if (employeeJson == null || employeeJson.isBlank()) {
+            return false;
+        }
+
+        try {
+            JSONObject employee = new JSONObject(employeeJson);
+            return readBooleanFlag(employee, "is_sleep_uploader");
+        } catch (JSONException ignored) {
+            return false;
+        }
+    }
+
+    private boolean readBooleanFlag(JSONObject object, String key) {
+        if (object == null || !object.has(key)) {
+            return false;
+        }
+
+        Object value = object.opt(key);
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue() == 1;
+        }
+
+        String text = String.valueOf(value).trim().toLowerCase(Locale.ROOT);
+        return "1".equals(text) || "true".equals(text) || "yes".equals(text) || "ya".equals(text);
     }
 
     private boolean hasP5MSubmissionForToday() {

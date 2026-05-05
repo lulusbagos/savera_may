@@ -537,9 +537,13 @@ public class LoginActivity extends AppCompatActivity {
         if (companyHeader != null && !companyHeader.trim().isEmpty()) {
             localStorage.setCompanyCode(companyHeader);
         }
+        boolean sleepUploader = readBooleanFlag(responseObj, "is_sleep_uploader");
         if (responseObj.has("employee") && !responseObj.get("employee").toString().equals("null")) {
-            localStorage.setEmployee(responseObj.get("employee").toString());
+            JSONObject employeeObj = new JSONObject(responseObj.get("employee").toString());
+            sleepUploader = sleepUploader || readBooleanFlag(employeeObj, "is_sleep_uploader");
+            localStorage.setEmployee(employeeObj.toString());
         }
+        localStorage.setSleepUploader(sleepUploader);
         if (responseObj.has("device") && !responseObj.get("device").toString().equals("null")) {
             JSONObject jsonDevice = new JSONObject(responseObj.get("device").toString());
             localStorage.setDevice(jsonDevice.optString("mac_address", localStorage.getDevice()));
@@ -551,6 +555,23 @@ public class LoginActivity extends AppCompatActivity {
             localStorage.setAdmin(true);
         }
         localStorage.markUserContextSynced();
+    }
+
+    private boolean readBooleanFlag(JSONObject object, String key) {
+        if (object == null || !object.has(key)) {
+            return false;
+        }
+
+        Object value = object.opt(key);
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue() == 1;
+        }
+
+        String text = String.valueOf(value).trim().toLowerCase(Locale.ROOT);
+        return "1".equals(text) || "true".equals(text) || "yes".equals(text) || "ya".equals(text);
     }
 
 }

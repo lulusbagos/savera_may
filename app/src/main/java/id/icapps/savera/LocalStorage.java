@@ -13,6 +13,7 @@ public class LocalStorage {
     private static final String KEY_P5M = "P5M";
     private static final String KEY_P5M_ANSWERS = "P5M_ANSWERS";
     private static final String KEY_ADMIN = "ADMIN";
+    private static final String KEY_SLEEP_UPLOADER = "SLEEP_UPLOADER";
     private static final String KEY_API_PUBLIC_URL = "API_PUBLIC_URL";
     private static final String KEY_API_LOCAL_URL = "API_LOCAL_URL";
     private static final String KEY_API_PREFERRED_ROUTE = "API_PREFERRED_ROUTE";
@@ -236,6 +237,15 @@ public class LocalStorage {
         editor.putBoolean(KEY_ADMIN, admin);
         editor.commit();
         this.admin = admin;
+    }
+
+    public boolean getSleepUploader() {
+        return sharedPreferences.getBoolean(KEY_SLEEP_UPLOADER, false);
+    }
+
+    public void setSleepUploader(boolean enabled) {
+        editor.putBoolean(KEY_SLEEP_UPLOADER, enabled);
+        editor.commit();
     }
 
     public String getApiPublicUrl() {
