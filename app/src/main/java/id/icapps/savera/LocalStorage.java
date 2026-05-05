@@ -29,6 +29,7 @@ public class LocalStorage {
     private static final String KEY_FIT_3 = "FIT_3";
     private static final String KEY_FIT_4 = "FIT_4";
     private static final String KEY_FIT_5 = "FIT_5";
+    private static final String KEY_LAST_SLEEP_SNAPSHOT = "LAST_SLEEP_SNAPSHOT";
 
     SharedPreferences sharedPreferences;
     SharedPreferences.Editor editor;
@@ -213,6 +214,16 @@ public class LocalStorage {
 
     public void setFit5(int value) {
         editor.putInt(KEY_FIT_5, value);
+        editor.commit();
+    }
+
+    public String getLastSleepSnapshotKey() {
+        String value = sharedPreferences.getString(KEY_LAST_SLEEP_SNAPSHOT, "");
+        return value == null ? "" : value;
+    }
+
+    public void setLastSleepSnapshotKey(String value) {
+        editor.putString(KEY_LAST_SLEEP_SNAPSHOT, value == null ? "" : value);
         editor.commit();
     }
 

@@ -156,7 +156,9 @@ public class MyDashboard extends Fragment {
     private NestedScrollView scrollView;
     private ProgressBar loading;
     private CircularProgressIndicator loadingSleep;
+    private final Object metricJsonLock = new Object();
     private final AtomicBoolean pendingUploadFlushRunning = new AtomicBoolean(false);
+    private final AtomicBoolean sleepSnapshotRunning = new AtomicBoolean(false);
 
     // Queue-wait polling state — keeps overlay open until queued item is sent
     private static final int QUEUE_WAIT_MAX_POLLS = 40;   // 40 × 3s ≈ 2 menit
@@ -824,6 +826,8 @@ public class MyDashboard extends Fragment {
                 (int) (rawWearableSleep % 60f)
         );
         textRest.setText(sleepWearable);
+
+        sendSleepSnapshotIfNeeded();
     }
 
     @SuppressLint("SetTextI18n")
@@ -1049,13 +1053,34 @@ public class MyDashboard extends Fragment {
 
                 for (SleepAnalysis.SleepSession row : getSleepSession) {
                     JSONObject obj = new JSONObject();
-                    obj.put("sleepStart", row.getSleepStart().getTime() / 1000);
-                    obj.put("sleepEnd", row.getSleepEnd().getTime() / 1000);
-                    obj.put("lightSleepDuration", row.getLightSleepDuration());
-                    obj.put("deepSleepDuration", row.getDeepSleepDuration());
-                    obj.put("remSleepDuration", row.getRemSleepDuration());
-                    obj.put("totalSleepDuration", (row.getLightSleepDuration() + row.getDeepSleepDuration() + row.getRemSleepDuration()));
-                    obj.put("awakeSleepDuration", row.getAwakeSleepDuration());
+                    long sleepStart = row.getSleepStart().getTime() / 1000;
+                    long sleepEnd = row.getSleepEnd().getTime() / 1000;
+                    long interval = Math.max(0, sleepEnd - sleepStart);
+                    long light = Math.max(0, row.getLightSleepDuration());
+                    long deep = Math.max(0, row.getDeepSleepDuration());
+                    long rem = Math.max(0, row.getRemSleepDuration());
+                    long awake = Math.max(0, row.getAwakeSleepDuration());
+                    long sleepStageTotal = light + deep + rem;
+                    if (interval > 0 && sleepStageTotal > interval) {
+                        double ratio = (double) interval / (double) sleepStageTotal;
+                        light = Math.round(light * ratio);
+                        deep = Math.round(deep * ratio);
+                        rem = Math.round(rem * ratio);
+                        long overflow = (light + deep + rem) - interval;
+                        if (overflow > 0) {
+                            light = Math.max(0, light - overflow);
+                        }
+                        awake = 0;
+                    } else if (interval > 0 && sleepStageTotal + awake > interval) {
+                        awake = Math.max(0, interval - sleepStageTotal);
+                    }
+                    obj.put("sleepStart", sleepStart);
+                    obj.put("sleepEnd", sleepEnd);
+                    obj.put("lightSleepDuration", light);
+                    obj.put("deepSleepDuration", deep);
+                    obj.put("remSleepDuration", rem);
+                    obj.put("totalSleepDuration", (light + deep + rem));
+                    obj.put("awakeSleepDuration", awake);
                     jsonSleep.put(obj);
                 }
             }
@@ -1545,11 +1570,6 @@ public class MyDashboard extends Fragment {
         String syncId = UUID.randomUUID().toString();
         long rangeStartTs = myData1.timeFrom;
         long rangeEndTs = myData1.timeTo;
-
-        // Build one data snapshot so summary/detail are consistent and not partially different.
-        // Extend the query window back 24h extra so overnight sleep stress/spo2 data is captured.
-        int extendedFrom = (int) myData1.timeFrom - (24 * 3600);
-        dataActivity(deviceToUse, extendedFrom, (int) rangeEndTs);
 
         String summaryData = buildSummaryPayload(deviceToUse, syncId, rangeStartTs, rangeEndTs);
         String detailData = buildDetailPayload(deviceToUse, syncId, rangeStartTs, rangeEndTs);
@@ -2200,54 +2220,57 @@ public class MyDashboard extends Fragment {
     }
 
     private String buildSummaryPayload(GBDevice device, String syncId, long rangeStartTs, long rangeEndTs) {
-        JSONObject params = new JSONObject();
-        try {
-            params.put("active", myData1.getActiveMinutesTotal());
-            params.put("steps", myData1.getStepsTotal());
-            int summaryHr = myData1.getHeartRate();
-            params.put("heart_rate", summaryHr);
-            params.put("distance", myData1.getDistanceTotal());
-            params.put("calories", myData1.getCalories());
-            params.put("spo2", myData1.bloodOxygen);
-            params.put("stress", myData1.stress);
-            params.put("sleep", myData1.sleepTotalMinutes);
-            params.put("sleep_start", myData1.sleepFrom);
-            params.put("sleep_end", myData1.sleepTo);
-            params.put("sleep_type", myData1.sleepType);
-            params.put("light_sleep", myData1.lightSleepTotalMinutes);
-            params.put("deep_sleep", myData1.deepSleepTotalMinutes);
-            params.put("rem_sleep", myData1.remSleepTotalMinutes);
-            params.put("awake", myData1.awakeSleepTotalMinutes);
-            params.put("wakeup", "0");
-            params.put("status", "0");
-            params.put("device_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
-            params.put("mac_address", device.getAddress());
-            params.put("app_version", getAppVersionStamp());
-            params.put("user_activity", jsonActivity.toString());
-            params.put("user_sleep", jsonSleep.toString());
-            params.put("user_stress", jsonStress.toString());
-            params.put("user_spo2", jsonSpo2.toString());
-            params.put("user_heart_rate_max", jsonHeartRateMax.toString());
-            params.put("user_heart_rate_resting", jsonHeartRateResting.toString());
-            params.put("user_heart_rate_manual", jsonHeartRateManual.toString());
-            params.put("device_id", deviceId);
-            params.put("employee_id", employeeId);
-            params.put("company_id", companyId);
-            params.put("department_id", departmentId);
-            params.put("shift_id", shiftId);
-            params.put("fit_to_work_q1", isFit1);
-            params.put("fit_to_work_q2", isFit2);
-            params.put("fit_to_work_q3", isFit3);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
+        synchronized (metricJsonLock) {
+            dataActivity(device, myData1.timeFrom, myData1.timeTo);
 
-        return params.toString();
+            JSONObject params = new JSONObject();
+            try {
+                params.put("active", myData1.getActiveMinutesTotal());
+                params.put("steps", myData1.getStepsTotal());
+                int summaryHr = myData1.getHeartRate();
+                params.put("heart_rate", summaryHr);
+                params.put("distance", myData1.getDistanceTotal());
+                params.put("calories", myData1.getCalories());
+                params.put("spo2", myData1.bloodOxygen);
+                params.put("stress", myData1.stress);
+                params.put("sleep", myData1.sleepTotalMinutes);
+                params.put("sleep_start", myData1.sleepFrom);
+                params.put("sleep_end", myData1.sleepTo);
+                params.put("sleep_type", myData1.sleepType);
+                params.put("light_sleep", myData1.lightSleepTotalMinutes);
+                params.put("deep_sleep", myData1.deepSleepTotalMinutes);
+                params.put("rem_sleep", myData1.remSleepTotalMinutes);
+                params.put("awake", myData1.awakeSleepTotalMinutes);
+                params.put("wakeup", "0");
+                params.put("status", "0");
+                params.put("device_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+                params.put("mac_address", device.getAddress());
+                params.put("app_version", getAppVersionStamp());
+                params.put("user_activity", jsonActivity.toString());
+                params.put("user_sleep", jsonSleep.toString());
+                params.put("user_stress", jsonStress.toString());
+                params.put("user_spo2", jsonSpo2.toString());
+                params.put("user_heart_rate_max", jsonHeartRateMax.toString());
+                params.put("user_heart_rate_resting", jsonHeartRateResting.toString());
+                params.put("user_heart_rate_manual", jsonHeartRateManual.toString());
+                params.put("device_id", deviceId);
+                params.put("employee_id", employeeId);
+                params.put("company_id", companyId);
+                params.put("department_id", departmentId);
+                params.put("shift_id", shiftId);
+                params.put("fit_to_work_q1", isFit1);
+                params.put("fit_to_work_q2", isFit2);
+                params.put("fit_to_work_q3", isFit3);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            return params.toString();
+        }
     }
 
     private boolean hasP5MSubmissionForToday() {
-        String todayMarker = String.valueOf(textNik.getText()) + "_" + textDate.getText();
-        if (Objects.equals(localStorage.getP5M(), todayMarker)) {
+        if (isTodayP5MMarker(localStorage.getP5M())) {
             return true;
         }
 
@@ -2271,6 +2294,39 @@ public class MyDashboard extends Fragment {
             LOG.warn("Failed parsing cached P5M answers", e);
             return false;
         }
+    }
+
+    private boolean isTodayP5MMarker(String marker) {
+        String nik = String.valueOf(textNik.getText()).trim();
+        if (marker == null || marker.isBlank() || nik.isBlank()) {
+            return false;
+        }
+
+        String prefix = nik + "_";
+        if (!marker.startsWith(prefix)) {
+            return false;
+        }
+
+        String markerDate = marker.substring(prefix.length()).trim();
+        String screenDate = String.valueOf(textDate.getText()).trim();
+        if (Objects.equals(markerDate, screenDate)) {
+            return true;
+        }
+
+        long now = System.currentTimeMillis();
+        String[] acceptedTodayFormats = new String[] {
+                new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(now),
+                new SimpleDateFormat("E, dd MMM yyyy", Locale.getDefault()).format(now),
+                new SimpleDateFormat("EEE, dd MMM yyyy", Locale.ENGLISH).format(now)
+        };
+
+        for (String today : acceptedTodayFormats) {
+            if (Objects.equals(markerDate, today)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void adaptUploadRouteForCurrentNetwork() {
@@ -2321,6 +2377,169 @@ public class MyDashboard extends Fragment {
                 LOG.warn("Network report failed: ", e);
             }
         }).start();
+    }
+
+    private void sendSleepSnapshotIfNeeded() {
+        if (localStorage == null || isDeveloperMode()) {
+            return;
+        }
+
+        Context context = getContext();
+        if (context == null || employeeId <= 0 || myData1.sleepTotalMinutes <= 0 || myData1.sleepFrom <= 0 || myData1.sleepTo <= 0) {
+            return;
+        }
+
+        GBDevice device = firstSnapshotDevice();
+        if (device == null) {
+            return;
+        }
+
+        final int snapshotTimeFrom = myData1.timeFrom;
+        final int snapshotTimeTo = myData1.timeTo;
+        final int snapshotSleepFrom = myData1.sleepFrom;
+        final int snapshotSleepTo = myData1.sleepTo;
+        final String snapshotSleepType = myData1.sleepType == null ? "night" : myData1.sleepType;
+        final long snapshotSleepTotal = myData1.sleepTotalMinutes;
+        final long snapshotLightSleep = myData1.lightSleepTotalMinutes;
+        final long snapshotDeepSleep = myData1.deepSleepTotalMinutes;
+        final long snapshotRemSleep = myData1.remSleepTotalMinutes;
+        final long snapshotAwakeSleep = myData1.awakeSleepTotalMinutes;
+        final int snapshotHeartRate = myData1.heartRate;
+        final int snapshotSpo2 = myData1.bloodOxygen;
+        final int snapshotStress = myData1.stress;
+        final String snapshotKey = sleepSnapshotQueueKey(device, snapshotSleepType, snapshotSleepFrom, snapshotSleepTo, snapshotSleepTotal);
+
+        if (snapshotKey.equals(localStorage.getLastSleepSnapshotKey())) {
+            return;
+        }
+
+        if (!sleepSnapshotRunning.compareAndSet(false, true)) {
+            return;
+        }
+
+        final Context appContext = context.getApplicationContext();
+        final String url = getString(R.string.base_url) + "/mobile/sleep-snapshot";
+
+        new Thread(() -> {
+            try {
+                String payload;
+                synchronized (metricJsonLock) {
+                    dataActivity(device, snapshotTimeFrom, snapshotTimeTo);
+                    if (jsonSleep.length() == 0 && jsonActivity.length() == 0) {
+                        return;
+                    }
+                    payload = buildSleepSnapshotPayload(
+                            device,
+                            snapshotTimeTo,
+                            snapshotSleepType,
+                            snapshotSleepFrom,
+                            snapshotSleepTo,
+                            snapshotSleepTotal,
+                            snapshotLightSleep,
+                            snapshotDeepSleep,
+                            snapshotRemSleep,
+                            snapshotAwakeSleep,
+                            snapshotHeartRate,
+                            snapshotSpo2,
+                            snapshotStress
+                    );
+                }
+
+                Http http = new Http(appContext, url);
+                http.setMethod("post");
+                http.setToken(true);
+                http.setHeader("X-App-Version", getAppVersionStamp());
+                http.setData(payload);
+                http.setConnectTimeoutMs(5000);
+                http.setReadTimeoutMs(8000);
+                http.setMaxAttempts(1);
+                http.send();
+
+                Integer code = http.getStatusCode();
+                if (code != null && (code == 200 || code == 201)) {
+                    localStorage.setLastSleepSnapshotKey(snapshotKey);
+                    return;
+                }
+
+                if (shouldQueueUpload(code)) {
+                    PendingUploadQueue.enqueue(
+                            appContext,
+                            PendingUploadQueue.createItem("sleep-snapshot", url, payload, snapshotKey)
+                    );
+                    localStorage.setLastSleepSnapshotKey(snapshotKey);
+                    showUploadPendingNotification();
+                }
+            } catch (Exception e) {
+                LOG.warn("Sleep snapshot sync failed", e);
+            } finally {
+                sleepSnapshotRunning.set(false);
+            }
+        }).start();
+    }
+
+    private GBDevice firstSnapshotDevice() {
+        List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
+        for (GBDevice device : devices) {
+            if (device == null || device.getDeviceCoordinator() == null) {
+                continue;
+            }
+            boolean selected = myData1.showAllDevices
+                    || (myData1.showDeviceList != null && myData1.showDeviceList.contains(device.getAddress()));
+            if (selected && device.getDeviceCoordinator().supportsActivityTracking()) {
+                return device;
+            }
+        }
+        return null;
+    }
+
+    private String buildSleepSnapshotPayload(
+            GBDevice device,
+            int snapshotTimeTo,
+            String sleepType,
+            int sleepFrom,
+            int sleepTo,
+            long sleepTotal,
+            long lightSleep,
+            long deepSleep,
+            long remSleep,
+            long awakeSleep,
+            int heartRate,
+            int spo2,
+            int stress
+    ) throws JSONException {
+        JSONObject params = new JSONObject();
+        params.put("device_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date(snapshotTimeTo * 1000L)));
+        params.put("mac_address", device.getAddress());
+        params.put("app_version", getAppVersionStamp());
+        params.put("employee_id", employeeId);
+        params.put("device_id", deviceId);
+        params.put("company_id", companyId);
+        params.put("department_id", departmentId);
+        params.put("shift_id", shiftId);
+        params.put("sleep", sleepTotal);
+        params.put("sleep_start", sleepFrom);
+        params.put("sleep_end", sleepTo);
+        params.put("sleep_type", sleepType);
+        params.put("light_sleep", lightSleep);
+        params.put("deep_sleep", deepSleep);
+        params.put("rem_sleep", remSleep);
+        params.put("awake", awakeSleep);
+        params.put("wakeup", 0);
+        params.put("heart_rate", heartRate);
+        params.put("spo2", spo2);
+        params.put("stress", stress);
+        params.put("user_activity", jsonActivity.toString());
+        params.put("user_sleep", jsonSleep.toString());
+        params.put("user_stress", jsonStress.toString());
+        params.put("user_spo2", jsonSpo2.toString());
+        params.put("user_heart_rate_max", jsonHeartRateMax.toString());
+        params.put("user_heart_rate_resting", jsonHeartRateResting.toString());
+        params.put("user_heart_rate_manual", jsonHeartRateManual.toString());
+        return params.toString();
+    }
+
+    private String sleepSnapshotQueueKey(GBDevice device, String sleepType, int sleepFrom, int sleepTo, long sleepTotal) {
+        return "sleep-snapshot|" + employeeId + "|" + device.getAddress() + "|" + sleepType + "|" + sleepFrom + "|" + sleepTo + "|" + sleepTotal;
     }
 
     private String buildNetworkReportPayload(GBDevice device) {
@@ -2442,25 +2661,28 @@ public class MyDashboard extends Fragment {
     }
 
     private String buildDetailPayload(GBDevice device, String syncId, long rangeStartTs, long rangeEndTs) {
+        synchronized (metricJsonLock) {
+            dataActivity(device, myData2.timeFrom, myData2.timeTo);
 
-        JSONObject params = new JSONObject();
-        try {
-            params.put("device_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
-            params.put("mac_address", device.getAddress());
-            params.put("app_version", getAppVersionStamp());
-            params.put("user_activity", jsonActivity.toString());
-            params.put("user_sleep", jsonSleep.toString());
-            params.put("user_stress", jsonStress.toString());
-            params.put("user_spo2", jsonSpo2.toString());
-            params.put("user_heart_rate_max", jsonHeartRateMax.toString());
-            params.put("user_heart_rate_resting", jsonHeartRateResting.toString());
-            params.put("user_heart_rate_manual", jsonHeartRateManual.toString());
-            params.put("employee_id", employeeId);
-        } catch (JSONException e) {
-            e.printStackTrace();
+            JSONObject params = new JSONObject();
+            try {
+                params.put("device_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date(myData2.timeTo * 1000L)));
+                params.put("mac_address", device.getAddress());
+                params.put("app_version", getAppVersionStamp());
+                params.put("user_activity", jsonActivity.toString());
+                params.put("user_sleep", jsonSleep.toString());
+                params.put("user_stress", jsonStress.toString());
+                params.put("user_spo2", jsonSpo2.toString());
+                params.put("user_heart_rate_max", jsonHeartRateMax.toString());
+                params.put("user_heart_rate_resting", jsonHeartRateResting.toString());
+                params.put("user_heart_rate_manual", jsonHeartRateManual.toString());
+                params.put("employee_id", employeeId);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            return params.toString();
         }
-
-        return params.toString();
     }
 
     // -----------------------------------------------------------------------
@@ -3312,80 +3534,80 @@ public class MyDashboard extends Fragment {
             long[] totalR = new long[]{0, 0, 0, 0};
 
             if (hour < 12) {
-                // After midnight (early morning): only count sleep from today onwards
-                // Don't include yesterday's residual data in sleepToday
                 today.add(Calendar.HOUR, -6);
 
                 int sleep1 = (int) (today.getTimeInMillis() / 1000);
                 int sleep2 = sleep1 + (6 * 3600);
-                int sleep4 = sleep1 - (12 * 3600);
+                int sleep3 = sleep1 + (12 * 3600);
 
-                int sleepToTemp = Math.min(sleep1 + (16 * 3600), timeTo);
-                ActivityAmounts amountToday2 = analysis.calculateActivityAmounts(provider.getAllActivitySamples(sleep2, sleepToTemp));
-                totalT = getTotalsSleepForActivityAmounts(amountToday2);
+                ActivityAmounts amountToday = analysis.calculateActivityAmounts(provider.getAllActivitySamples(sleep2, sleep3));
+                totalT = getTotalsSleepForActivityAmounts(amountToday);
                 ActivityAmounts amountYesterday = analysis.calculateActivityAmounts(provider.getAllActivitySamples(sleep1, sleep2));
                 totalY = getTotalsSleepForActivityAmounts(amountYesterday);
-                List<? extends ActivitySample> restSamples = provider.getAllActivitySamples(sleep4, sleep1);
-                totalR = resolveRestSleepTotals(analysis, restSamples);
+
+                Calendar restStart = (Calendar) today.clone();
+                restStart.set(Calendar.HOUR_OF_DAY, 11);
+                restStart.set(Calendar.MINUTE, 0);
+                restStart.set(Calendar.SECOND, 0);
+                Calendar restEnd = (Calendar) today.clone();
+                restEnd.set(Calendar.HOUR_OF_DAY, 14);
+                restEnd.set(Calendar.MINUTE, 0);
+                restEnd.set(Calendar.SECOND, 0);
+                ActivityAmounts amountRest = analysis.calculateActivityAmounts(provider.getAllActivitySamples(
+                        (int) (restStart.getTimeInMillis() / 1000),
+                        (int) (restEnd.getTimeInMillis() / 1000)
+                ));
+                totalR = getTotalsSleepForActivityAmounts(amountRest);
+
+                if ((totalR[0] + totalR[1] + totalR[2]) > 60) {
+                    totalR[0] = 60;
+                    totalR[1] = 0;
+                    totalR[2] = 0;
+                }
 
                 sleepType = "night";
             } else {
                 today.add(Calendar.HOUR, 6);
 
                 int sleep1 = (int) (today.getTimeInMillis() / 1000);
-                int sleep4 = sleep1 - (12 * 3600);
 
-                List<? extends ActivitySample> restSamples = provider.getAllActivitySamples(sleep4, sleep1);
-                totalR = resolveRestSleepTotals(analysis, restSamples);
+                Calendar restStart = (Calendar) today.clone();
+                restStart.add(Calendar.DAY_OF_MONTH, -1);
+                restStart.set(Calendar.HOUR_OF_DAY, 23);
+                restStart.set(Calendar.MINUTE, 0);
+                restStart.set(Calendar.SECOND, 0);
+                Calendar restEnd = (Calendar) today.clone();
+                restEnd.set(Calendar.HOUR_OF_DAY, 2);
+                restEnd.set(Calendar.MINUTE, 0);
+                restEnd.set(Calendar.SECOND, 0);
+                ActivityAmounts amountRest = analysis.calculateActivityAmounts(provider.getAllActivitySamples(
+                        (int) (restStart.getTimeInMillis() / 1000),
+                        (int) (restEnd.getTimeInMillis() / 1000)
+                ));
+                totalR = getTotalsSleepForActivityAmounts(amountRest);
+
+                if ((totalR[0] + totalR[1] + totalR[2]) > 60) {
+                    totalR[0] = 60;
+                    totalR[1] = 0;
+                    totalR[2] = 0;
+                }
 
                 sleepType = "day";
             }
 
             sleepFrom = (int) (today.getTimeInMillis() / 1000);
-            sleepTo = Math.min(sleepFrom + (16 * 3600), timeTo);
+            sleepTo = sleepFrom + (12 * 3600);
 
             ActivityAmounts amountSleep = analysis.calculateActivityAmounts(provider.getAllActivitySamples(sleepFrom, sleepTo));
             long[] totalS = getTotalsSleepForActivityAmounts(amountSleep);
 
-            // For sleepToday calculation:
-            // - If hour < 12 (early morning): show the actual early-morning sleep segment
-            // - If hour >= 12 (afternoon/evening): count today's sleep normally
-            long sleepTodayMinutes = (totalT[0] + totalT[1] + totalT[2]);
             if (Objects.equals(sleepType, "day")) {
                 totalT[0] = totalS[0];
                 totalT[1] = totalS[1];
                 totalT[2] = totalS[2];
-                sleepTodayMinutes = (totalT[0] + totalT[1] + totalT[2]);
             }
 
-            return new long[]{totalS[0], totalS[1], totalS[2], totalS[3], sleepTodayMinutes, (totalY[0] + totalY[1] + totalY[2]), (totalR[0] + totalR[1] + totalR[2])};
-        }
-
-        private long[] resolveRestSleepTotals(ActivityAnalysis analysis, List<? extends ActivitySample> restSamples) {
-            if (restSamples == null || restSamples.isEmpty()) {
-                return new long[]{0, 0, 0, 0};
-            }
-
-            ActivityAmounts amountRest = analysis.calculateActivityAmounts(restSamples);
-            long[] totalR = getTotalsSleepForActivityAmounts(amountRest);
-            long restSleepMinutes = totalR[0] + totalR[1] + totalR[2];
-
-            // Rule: no sleep data => don't count, < 1 hour => keep exact wearable value, >= 1 hour => cap to 1 hour.
-            if (restSleepMinutes <= 0) {
-                totalR[0] = 0;
-                totalR[1] = 0;
-                totalR[2] = 0;
-                return totalR;
-            }
-
-            if (restSleepMinutes < 60) {
-                return totalR;
-            }
-
-            totalR[0] = 60;
-            totalR[1] = 0;
-            totalR[2] = 0;
-            return totalR;
+            return new long[]{totalS[0], totalS[1], totalS[2], totalS[3], (totalT[0] + totalT[1] + totalT[2]), (totalY[0] + totalY[1] + totalY[2]), (totalR[0] + totalR[1] + totalR[2])};
         }
 
         private long getSleepMinutesTotal() {
@@ -3405,7 +3627,7 @@ public class MyDashboard extends Fragment {
                     idx++;
                     if ((showAllDevices || showDeviceList.contains(dev.getAddress())) && dev.getDeviceCoordinator().supportsActivityTracking()) {
                         long[] sleep = getSleep(dev, dbHandler);
-                        sleepTotalMinutes += (sleep[0] + sleep[1] + sleep[2]);
+                        sleepTotalMinutes += (sleep[0] + sleep[1] + sleep[2] + sleep[6]);
                         lightSleepTotalMinutes += sleep[0];
                         deepSleepTotalMinutes += sleep[1];
                         remSleepTotalMinutes += sleep[2];
@@ -3418,10 +3640,7 @@ public class MyDashboard extends Fragment {
             } catch (Exception e) {
                 LOG.warn("Could not calculate total amount of sleep: ", e);
             }
-            // Tidur kemarin (sebelum tengah malam) dibatasi maks 1 jam.
-            // Tidur hari ini (setelah tengah malam) dihitung penuh.
-            long cappedYesterday = Math.min(sleepYesterday, 60L);
-            return cappedYesterday + sleepToday;
+            return sleepTotalMinutes;
         }
 
         private float getSleepMinutesGoalFactor() {

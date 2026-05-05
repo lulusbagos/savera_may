@@ -61,8 +61,9 @@ public class MyLeaderboard extends Fragment {
     private static final String KEY_DATA_CLEARED_V1 = "data_cleared_v1";
     private static final int WEEKLY_RETENTION_DAYS = 7;
     private static final int TARGET_SLEEP_MINUTES = 7 * 60;
-    private static final int SLEEP_WINDOW_OFFSET_HOURS = 6; // 18:00 previous day
-    private static final int SLEEP_WINDOW_TOTAL_HOURS = 16; // until 10:00 target day
+    private static final int SLEEP_WINDOW_OFFSET_HOURS = 6; // Match dashboard sleep boundary.
+    private static final int SLEEP_WINDOW_TOTAL_HOURS = 12;
+    private static final int REST_SLEEP_CAP_MINUTES = 60;
 
     private TextView textPeriod, textTotal, textAverage, textRank, textEmployeeName2, textEmployeeNik2;
     private LinearLayout listView;
@@ -210,33 +211,87 @@ public class MyLeaderboard extends Fragment {
         windowBase.set(Calendar.SECOND, 0);
         windowBase.set(Calendar.MILLISECOND, 0);
 
-        int sleepFrom = (int) (windowBase.getTimeInMillis() / 1000L) - (SLEEP_WINDOW_OFFSET_HOURS * 3600);
+        Calendar sleepBase = (Calendar) windowBase.clone();
+        int currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        if (currentHour < 12) {
+            sleepBase.add(Calendar.HOUR_OF_DAY, -SLEEP_WINDOW_OFFSET_HOURS);
+        } else {
+            sleepBase.add(Calendar.HOUR_OF_DAY, SLEEP_WINDOW_OFFSET_HOURS);
+        }
+
+        int sleepFrom = (int) (sleepBase.getTimeInMillis() / 1000L);
         int sleepTo = sleepFrom + (SLEEP_WINDOW_TOTAL_HOURS * 3600);
+        Calendar restStart = (Calendar) sleepBase.clone();
+        Calendar restEnd = (Calendar) sleepBase.clone();
+        if (currentHour < 12) {
+            restStart.set(Calendar.HOUR_OF_DAY, 11);
+            restStart.set(Calendar.MINUTE, 0);
+            restStart.set(Calendar.SECOND, 0);
+            restEnd.set(Calendar.HOUR_OF_DAY, 14);
+            restEnd.set(Calendar.MINUTE, 0);
+            restEnd.set(Calendar.SECOND, 0);
+        } else {
+            restStart.add(Calendar.DAY_OF_MONTH, -1);
+            restStart.set(Calendar.HOUR_OF_DAY, 23);
+            restStart.set(Calendar.MINUTE, 0);
+            restStart.set(Calendar.SECOND, 0);
+            restEnd.set(Calendar.HOUR_OF_DAY, 2);
+            restEnd.set(Calendar.MINUTE, 0);
+            restEnd.set(Calendar.SECOND, 0);
+        }
+        int restFrom = (int) (restStart.getTimeInMillis() / 1000L);
+        int restTo = (int) (restEnd.getTimeInMillis() / 1000L);
 
         // For current day, avoid projecting future values.
         Calendar now = Calendar.getInstance();
         if (isSameDay(windowBase, now)) {
             sleepTo = Math.min(sleepTo, nowTs);
+            restTo = Math.min(restTo, nowTs);
         }
 
-        if (sleepTo <= sleepFrom) {
+        if (sleepTo <= sleepFrom && restTo <= restFrom) {
             return new SleepWindowData(0L, 0);
         }
 
         DeviceCoordinator coordinator = device.getDeviceCoordinator();
         SampleProvider<? extends ActivitySample> provider = coordinator.getSampleProvider(device, dbHandler.getDaoSession());
-        List<? extends ActivitySample> samples = provider.getAllActivitySamples(sleepFrom, sleepTo);
+        ActivityAnalysis analysis = new ActivityAnalysis();
 
-        if (samples == null || samples.isEmpty()) {
+        List<? extends ActivitySample> sleepSamples = sleepTo > sleepFrom
+                ? provider.getAllActivitySamples(sleepFrom, sleepTo)
+                : Collections.emptyList();
+        List<? extends ActivitySample> restSamples = restTo > restFrom
+                ? provider.getAllActivitySamples(restFrom, restTo)
+                : Collections.emptyList();
+        if (sleepSamples == null) {
+            sleepSamples = Collections.emptyList();
+        }
+        if (restSamples == null) {
+            restSamples = Collections.emptyList();
+        }
+
+        int sampleCount = sleepSamples.size() + restSamples.size();
+        if (sampleCount <= 0) {
             return new SleepWindowData(0L, 0);
         }
 
-        ActivityAnalysis analysis = new ActivityAnalysis();
+        long mainSleepMinutes = calculateSleepMinutes(analysis, sleepSamples);
+        long restSleepMinutes = calculateSleepMinutes(analysis, restSamples);
+        if (restSleepMinutes > REST_SLEEP_CAP_MINUTES) {
+            restSleepMinutes = REST_SLEEP_CAP_MINUTES;
+        }
+
+        return new SleepWindowData(mainSleepMinutes + restSleepMinutes, sampleCount);
+    }
+
+    private long calculateSleepMinutes(ActivityAnalysis analysis, List<? extends ActivitySample> samples) {
+        if (samples == null || samples.isEmpty()) {
+            return 0L;
+        }
+
         ActivityAmounts amounts = analysis.calculateActivityAmounts(samples);
         long[] totals = DailyTotals.getTotalsSleepForActivityAmounts(amounts);
-        long sleepMinutes = totals[0] + totals[1] + totals[2];
-
-        return new SleepWindowData(sleepMinutes, samples.size());
+        return totals[0] + totals[1] + totals[2];
     }
 
     private boolean isSameDay(Calendar a, Calendar b) {

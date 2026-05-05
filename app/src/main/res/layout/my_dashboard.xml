@@ -825,7 +825,7 @@
 
                 </LinearLayout>
 
-                <!-- Q1: Minum obat menyebabkan kantuk -->
+                <!-- Q1: Minum obat menyebabkan fatigue -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -852,7 +852,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Apakah anda sedang minum obat yang menyebabkan kantuk?"
+                        android:text="Apakah anda sedang minum obat yang menyebabkan fatigue?"
                         android:textSize="@dimen/_11sdp"
                         android:textColor="#E0E0E0"
                         android:lineSpacingMultiplier="1.3"

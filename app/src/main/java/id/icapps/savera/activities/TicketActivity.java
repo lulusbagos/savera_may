@@ -201,7 +201,8 @@ public class TicketActivity extends AppCompatActivity {
             Http http = new Http(TicketActivity.this, url);
             http.setMethod("get");
             http.setToken(true);
-            http.setCacheTtlSeconds(900);
+            http.setBypassCache(true);
+            http.setCacheTtlSeconds(0);
             http.send();
 
             runOnUiThread(() -> {
@@ -394,7 +395,8 @@ public class TicketActivity extends AppCompatActivity {
                 "sleep_total_minutes",
                 "total_sleep_minutes",
                 "sleep_duration_minutes",
-                "sleepMinute"
+                "sleepMinute",
+                "sleep_minutes_api"
         };
         for (String key : minuteKeys) {
             if (response.has(key) && !response.isNull(key)) {
@@ -404,7 +406,8 @@ public class TicketActivity extends AppCompatActivity {
 
         String[] durationKeys = {
                 "sleep_duration",
-                "sleep_total"
+                "sleep_total",
+                "sleep_text"
         };
         for (String key : durationKeys) {
             if (response.has(key) && !response.isNull(key)) {
@@ -458,7 +461,7 @@ public class TicketActivity extends AppCompatActivity {
 
         boolean readyToWork = fit1 == 0 && fit2 == 0 && fit3 == 1;
         String fitDecision = readyToWork ? "Ya, siap bekerja" : "Tidak siap bekerja";
-        String fitDetail = "1) Minum obat menyebabkan kantuk: " + fit1Label
+        String fitDetail = "1) Minum obat menyebabkan fatigue: " + fit1Label
                 + "\n2) Ada masalah konsentrasi: " + fit2Label
                 + "\n3) Siap bekerja aman: " + fit3Label
                 + "\nKomitmen/Kesiapan Operator: " + fitDecision;
