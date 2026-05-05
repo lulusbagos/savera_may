@@ -55,6 +55,7 @@ public class MyDevices extends Fragment {
     private Button btnAdd;
     private ImageButton btnScan;
     private TextView textSearch;
+    private LinearLayout deviceSearchPanel;
     private LinearLayout deviceNotConnect;
     List<GBDevice> deviceList;
     private HashMap<String, DailyTotals> deviceActivityHashMap = new HashMap();
@@ -132,6 +133,7 @@ public class MyDevices extends Fragment {
         });
 
         deviceNotConnect = view.findViewById(R.id.deviceNotConnect);
+        deviceSearchPanel = view.findViewById(R.id.deviceSearchPanel);
 
         btnAdd = view.findViewById(R.id.btnAdd);
         btnAdd.setOnClickListener(new View.OnClickListener() {
@@ -239,13 +241,16 @@ public class MyDevices extends Fragment {
     public void infoNotConnect() {
         if (deviceList.isEmpty()) {
             deviceNotConnect.setVisibility(View.VISIBLE);
+            deviceSearchPanel.setVisibility(View.GONE);
             btnAdd.setVisibility(View.GONE);
             textSearch.setVisibility(View.GONE);
         } else {
             deviceNotConnect.setVisibility(View.GONE);
+            deviceSearchPanel.setVisibility(View.GONE);
             btnAdd.setVisibility(View.GONE);
             textSearch.setVisibility(View.GONE);
             if (localStorage.getAdmin()) {
+                deviceSearchPanel.setVisibility(View.VISIBLE);
                 btnAdd.setVisibility(View.VISIBLE);
                 textSearch.setVisibility(View.VISIBLE);
             }

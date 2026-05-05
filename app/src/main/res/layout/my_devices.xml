@@ -4,135 +4,317 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@drawable/bg_device_manager_screen"
     tools:context=".activities.MyDevices">
 
-    <RelativeLayout
-        android:layout_width="match_parent"
+    <LinearLayout
+        android:id="@+id/deviceHeader"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        tools:ignore="MissingConstraints">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/_18sdp"
+        android:paddingTop="@dimen/_28sdp"
+        android:paddingEnd="@dimen/_18sdp"
+        android:paddingBottom="@dimen/_12sdp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="@dimen/_34sdp"
+            android:layout_height="@dimen/_34sdp"
+            android:background="@drawable/bg_device_manager_card"
+            android:contentDescription="Kembali"
+            android:padding="@dimen/_9sdp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_back"
+            tools:ignore="ContentDescription,HardcodedText" />
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="start"
-            android:layout_marginTop="@dimen/_30sdp"
-            android:layout_marginLeft="@dimen/_15sdp">
-
-            <ImageButton
-                android:id="@+id/btnBack"
-                android:layout_width="@dimen/_25sdp"
-                android:layout_height="@dimen/_25sdp"
-                android:contentDescription="ic_back"
-                android:background="@android:color/transparent"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_back"
-                tools:ignore="ContentDescription,HardcodedText" />
+            android:layout_marginStart="@dimen/_12sdp"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="@dimen/_16sdp"
-                android:text="Perangkat"
-                android:textColor="#000"
-                android:layout_marginLeft="@dimen/_15sdp"
+                android:fontFamily="sans"
+                android:letterSpacing="0.03"
+                android:text="DEVICE MANAGER"
+                android:textColor="#0D2B47"
+                android:textSize="@dimen/_17sdp"
+                android:textStyle="bold"
+                tools:ignore="HardcodedText" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/_2sdp"
+                android:text="Kelola wearable operator dan uploader tidur"
+                android:textColor="#6B7E91"
+                android:textSize="@dimen/_10sdp"
                 tools:ignore="HardcodedText" />
 
         </LinearLayout>
 
-    </RelativeLayout>
+    </LinearLayout>
 
     <androidx.core.widget.NestedScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:layout_marginTop="@dimen/_70sdp"
-        android:layout_marginBottom="@dimen/_110sdp">
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        android:paddingStart="@dimen/_15sdp"
+        android:paddingEnd="@dimen/_15sdp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/deviceHeader">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/_110sdp"
             android:gravity="top"
-            android:orientation="vertical"
-            android:layout_marginHorizontal="@dimen/_15sdp">
+            android:orientation="vertical">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <EditText
-                    android:id="@+id/textSearch"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/_40sdp"
-                    android:layout_weight="2"
-                    android:textSize="@dimen/_13sdp"
-                    android:autofillHints=""
-                    android:hint="Cari nama / mac addr (tanpa separator)"
-                    android:textColor="#999"
-                    android:textColorHint="#999"
-                    android:inputType="text"
-                    android:backgroundTint="#999"
-                    tools:ignore="HardcodedText" />
+                android:layout_marginTop="@dimen/_4sdp"
+                android:background="@drawable/bg_device_manager_hero"
+                android:elevation="@dimen/_4sdp"
+                android:orientation="vertical"
+                android:paddingStart="@dimen/_16sdp"
+                android:paddingTop="@dimen/_16sdp"
+                android:paddingEnd="@dimen/_16sdp"
+                android:paddingBottom="@dimen/_16sdp">
 
                 <LinearLayout
-                    android:layout_width="@dimen/_100sdp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:paddingTop="@dimen/_8sdp"
-                    android:paddingLeft="@dimen/_5sdp">
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                    <Button
-                        android:id="@+id/btnAdd"
-                        android:layout_width="wrap_content"
-                        android:layout_height="@dimen/_30sdp"
-                        android:text="Add"
+                    <FrameLayout
+                        android:layout_width="@dimen/_48sdp"
+                        android:layout_height="@dimen/_48sdp"
+                        android:background="@drawable/bg_device_manager_icon">
+
+                        <ImageView
+                            android:layout_width="@dimen/_28sdp"
+                            android:layout_height="@dimen/_28sdp"
+                            android:layout_gravity="center"
+                            android:contentDescription="Wearable"
+                            android:src="@drawable/ic_device_miband"
+                            android:tint="#FFFFFF"
+                            tools:ignore="ContentDescription,HardcodedText" />
+
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/_12sdp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Mode Upload Tidur Siap"
+                            android:textColor="#FFFFFF"
+                            android:textSize="@dimen/_15sdp"
+                            android:textStyle="bold"
+                            tools:ignore="HardcodedText" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/_3sdp"
+                            android:lineSpacingExtra="@dimen/_2sdp"
+                            android:text="Pilih Mi Band aktif, lalu upload data tidur tanpa login ulang."
+                            android:textColor="#D9F8FF"
+                            android:textSize="@dimen/_10sdp"
+                            tools:ignore="HardcodedText" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/_14sdp"
+                    android:background="@drawable/bg_device_manager_badge"
+                    android:paddingStart="@dimen/_12sdp"
+                    android:paddingTop="@dimen/_5sdp"
+                    android:paddingEnd="@dimen/_12sdp"
+                    android:paddingBottom="@dimen/_5sdp"
+                    android:text="MAC-based sync aktif"
+                    android:textColor="#087D67"
+                    android:textSize="@dimen/_9sdp"
+                    android:textStyle="bold"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/deviceSearchPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/_14sdp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/_44sdp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_device_manager_search"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/_12sdp"
+                    android:paddingEnd="@dimen/_8sdp">
+
+                    <ImageView
+                        android:layout_width="@dimen/_18sdp"
+                        android:layout_height="@dimen/_18sdp"
+                        android:contentDescription="Cari"
+                        android:src="@drawable/ic_search"
+                        android:tint="#7991A6"
+                        tools:ignore="ContentDescription,HardcodedText" />
+
+                    <EditText
+                        android:id="@+id/textSearch"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="@dimen/_8sdp"
+                        android:layout_weight="1"
+                        android:autofillHints=""
+                        android:background="@android:color/transparent"
+                        android:hint="Cari nama atau MAC"
+                        android:inputType="text"
+                        android:padding="0dp"
+                        android:singleLine="true"
+                        android:textColor="#102A43"
+                        android:textColorHint="#90A4B8"
                         android:textSize="@dimen/_11sdp"
-                        android:backgroundTint="@drawable/bg_button"
-                        android:layout_gravity="end"
-                        android:visibility="visible"
                         tools:ignore="HardcodedText" />
 
                 </LinearLayout>
 
+                <Button
+                    android:id="@+id/btnAdd"
+                    android:layout_width="@dimen/_96sdp"
+                    android:layout_height="@dimen/_44sdp"
+                    android:layout_marginStart="@dimen/_8sdp"
+                    android:background="@drawable/bg_device_manager_action"
+                    android:text="Scan"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="@dimen/_11sdp"
+                    android:textStyle="bold"
+                    android:visibility="visible"
+                    tools:ignore="HardcodedText" />
+
             </LinearLayout>
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/deviceListView"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_below="@id/textSearch"
-                android:layout_marginTop="@dimen/_10sdp"
-                android:divider="@null" />
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/_14sdp"
+                android:background="@drawable/bg_device_manager_card"
+                android:elevation="@dimen/_2sdp"
+                android:orientation="vertical"
+                android:padding="@dimen/_10sdp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Daftar Perangkat"
+                    android:textColor="#102A43"
+                    android:textSize="@dimen/_12sdp"
+                    android:textStyle="bold"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/_2sdp"
+                    android:text="Tap perangkat untuk sinkronisasi dan upload data tidur."
+                    android:textColor="#6B7E91"
+                    android:textSize="@dimen/_9sdp"
+                    tools:ignore="HardcodedText" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/deviceListView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/_8sdp"
+                    android:divider="@null"
+                    android:nestedScrollingEnabled="false" />
+
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/deviceNotConnect"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="top|center"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/_14sdp"
+                android:layout_marginBottom="@dimen/_30sdp"
+                android:background="@drawable/bg_device_manager_card"
+                android:gravity="center"
                 android:orientation="vertical"
-                android:paddingHorizontal="@dimen/_20sdp"
-                android:layout_marginTop="@dimen/_30sdp"
-                android:layout_marginBottom="@dimen/_30sdp">
+                android:paddingStart="@dimen/_18sdp"
+                android:paddingTop="@dimen/_20sdp"
+                android:paddingEnd="@dimen/_18sdp"
+                android:paddingBottom="@dimen/_22sdp">
 
                 <ImageView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="@dimen/_160sdp"
+                    android:layout_height="@dimen/_120sdp"
                     android:adjustViewBounds="true"
                     android:background="@android:color/transparent"
-                    android:scaleType="fitStart"
+                    android:contentDescription="Belum ada perangkat"
+                    android:scaleType="fitCenter"
                     android:src="@drawable/bg_no_device"
-                    android:layout_marginHorizontal="@dimen/_15sdp"
-                    android:layout_marginBottom="@dimen/_50sdp" />
+                    tools:ignore="ContentDescription,HardcodedText" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/_12sdp"
+                    android:gravity="center"
+                    android:text="Belum ada wearable aktif"
+                    android:textColor="#102A43"
+                    android:textSize="@dimen/_14sdp"
+                    android:textStyle="bold"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/_5sdp"
+                    android:gravity="center"
+                    android:lineSpacingExtra="@dimen/_2sdp"
+                    android:text="Pastikan Bluetooth dan lokasi aktif, lalu scan Mi Band yang akan dipakai operator."
+                    android:textColor="#6B7E91"
+                    android:textSize="@dimen/_10sdp"
+                    tools:ignore="HardcodedText" />
 
                 <ImageButton
                     android:id="@+id/btnScan"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="@dimen/_170sdp"
+                    android:layout_height="@dimen/_46sdp"
+                    android:layout_marginTop="@dimen/_16sdp"
                     android:adjustViewBounds="true"
                     android:background="@android:color/transparent"
-                    android:contentDescription="bg_btn_find_device"
-                    android:scaleType="fitStart"
+                    android:contentDescription="Cari perangkat"
+                    android:scaleType="fitCenter"
                     android:src="@drawable/bg_btn_find_device"
                     tools:ignore="ContentDescription,HardcodedText" />
 
