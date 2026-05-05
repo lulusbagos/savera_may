@@ -212,7 +212,6 @@ public class LoginActivity extends AppCompatActivity {
                 Http http = new Http(LoginActivity.this, url);
                 http.setMethod("post");
                 http.setData(data);
-                http.setUseEndpointResolver(false);
                 http.setIncludeCompanyHeader(!companyHeader.isEmpty());
                 if (!companyHeader.isEmpty()) {
                     http.setCompanyHeaderValue(companyHeader);
@@ -336,7 +335,6 @@ public class LoginActivity extends AppCompatActivity {
                 http.setMethod("get");
                 http.setToken(true);
                 http.setCacheTtlSeconds(900);
-                http.setUseEndpointResolver(false);
                 http.setIncludeCompanyHeader(true);
                 if (selectedCompanyHeader != null && !selectedCompanyHeader.trim().isEmpty()) {
                     http.setCompanyHeaderValue(selectedCompanyHeader.trim().toUpperCase(Locale.ROOT));
