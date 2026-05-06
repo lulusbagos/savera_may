@@ -5,18 +5,19 @@ import static id.icapps.savera.util.GB.toast;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.text.method.LinkMovementMethod;
-import android.text.Spanned;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.text.HtmlCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.widget.NestedScrollView;
 
@@ -191,23 +192,77 @@ public class NotificationActivity extends AppCompatActivity {
         date.setLayoutParams(dateParams);
         card.addView(date);
 
-        TextView body = new TextView(this);
-        body.setText(renderHtml(resolveNotificationBodyHtml(row)));
-        body.setTextSize(12);
-        body.setTextColor(Color.parseColor("#2E2E2E"));
-        body.setAutoLinkMask(android.text.util.Linkify.WEB_URLS);
-        body.setMovementMethod(LinkMovementMethod.getInstance());
+        WebView body = new WebView(this);
+        configureNotificationWebView(body);
         LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         );
         bodyParams.topMargin = dp(10);
         body.setLayoutParams(bodyParams);
+        body.loadDataWithBaseURL(null, resolveNotificationBodyDocument(row), "text/html", "UTF-8", null);
         card.addView(body);
 
-        card.setOnClickListener(v -> markReadIfNeeded(row.optInt("id", 0), readStatus, status));
+        final int notificationId = row.optInt("id", 0);
+        final int initialReadStatus = readStatus;
+        View.OnClickListener readClick = v -> markReadIfNeeded(notificationId, initialReadStatus, status);
+        card.setOnClickListener(readClick);
+        body.setOnClickListener(readClick);
 
         return card;
+    }
+
+    private void configureNotificationWebView(WebView webView) {
+        webView.setBackgroundColor(Color.TRANSPARENT);
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        webView.setVerticalScrollBarEnabled(false);
+        webView.setHorizontalScrollBarEnabled(false);
+        webView.setFocusable(false);
+        webView.setFocusableInTouchMode(false);
+        webView.setLongClickable(false);
+        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(false);
+        settings.setDomStorageEnabled(false);
+        settings.setDatabaseEnabled(false);
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
+        settings.setLoadWithOverviewMode(true);
+        settings.setUseWideViewPort(false);
+        settings.setTextZoom(100);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return true;
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return true;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                resizeWebViewToContent(view);
+            }
+        });
+    }
+
+    private void resizeWebViewToContent(WebView webView) {
+        webView.postDelayed(() -> {
+            int contentHeight = (int) Math.ceil(webView.getContentHeight() * webView.getScale());
+            int targetHeight = Math.max(dp(72), contentHeight + dp(8));
+
+            if (webView.getLayoutParams() != null && webView.getLayoutParams().height != targetHeight) {
+                webView.getLayoutParams().height = targetHeight;
+                webView.requestLayout();
+            }
+        }, 150L);
     }
 
     private void markReadIfNeeded(int id, int currentStatus, TextView statusView) {
@@ -267,23 +322,56 @@ public class NotificationActivity extends AppCompatActivity {
         toast(this, message, Toast.LENGTH_SHORT, GB.ERROR);
     }
 
-    private Spanned renderHtml(String html) {
-        String safeHtml = (html == null || html.isBlank()) ? "<p>-</p>" : html;
-        return HtmlCompat.fromHtml(safeHtml, HtmlCompat.FROM_HTML_MODE_LEGACY);
-    }
+    private String resolveNotificationBodyDocument(JSONObject row) {
+        String fullHtml = row.optString("message_html_full", "").trim();
+        if (!fullHtml.isEmpty()) {
+            return fullHtml;
+        }
 
-    private String resolveNotificationBodyHtml(JSONObject row) {
         String html = row.optString("message_html", "").trim();
         if (!html.isEmpty()) {
-            return html;
+            return buildNotificationHtmlDocument(html);
         }
 
         String plain = row.optString("message", "").trim();
         if (!plain.isEmpty()) {
-            return "<p>" + plain + "</p>";
+            return buildNotificationHtmlDocument("<p>" + escapeHtml(plain) + "</p>");
         }
 
-        return "<p>-</p>";
+        return buildNotificationHtmlDocument("<p>-</p>");
+    }
+
+    private String buildNotificationHtmlDocument(String bodyHtml) {
+        String safeBody = (bodyHtml == null || bodyHtml.isBlank()) ? "<p>-</p>" : bodyHtml;
+        if (safeBody.toLowerCase(Locale.US).contains("<html")) {
+            return safeBody;
+        }
+
+        return "<!doctype html><html><head>"
+                + "<meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1\">"
+                + "<style>"
+                + "*{box-sizing:border-box}html,body{margin:0;padding:0;background:transparent;color:#0f172a;"
+                + "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:13px;line-height:1.45}"
+                + "body{overflow:hidden}.savera-notification{width:100%;padding:0}.sn-card{border:1px solid #bfdbfe;border-radius:18px;"
+                + "padding:14px;background:linear-gradient(135deg,#ffffff 0%,#eff6ff 100%);box-shadow:0 14px 28px rgba(15,23,42,.08)}"
+                + ".sn-rich p{margin:0 0 10px}.sn-rich a{color:#0369a1;font-weight:700;text-decoration:none}"
+                + ".sn-rich table{width:100%;border-collapse:collapse;margin:8px 0}.sn-rich th,.sn-rich td{border:1px solid #e2e8f0;padding:8px;text-align:left}"
+                + ".sn-rich img{max-width:100%;height:auto;border-radius:12px}"
+                + "</style></head><body>" + safeBody + "</body></html>";
+    }
+
+    private String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     private String formatDate(String isoDate) {
