@@ -241,10 +241,10 @@ public class TicketActivity extends AppCompatActivity {
                             textTime.setText(response.getString("time"));
                         }
 
-                        // Prioritas: raw sleep dari API (wearable), fallback ke cache lokal dashboard.
-                        long sleepMinutes = extractSleepMinutes(response);
+                        // Prioritas: total sleep dari dashboard lokal, fallback ke API jika cache belum ada.
+                        long sleepMinutes = localStorage.getSleepMinutes();
                         if (sleepMinutes < 0) {
-                            sleepMinutes = localStorage.getSleepMinutes();
+                            sleepMinutes = extractSleepMinutes(response);
                         }
                         if (sleepMinutes >= 0) {
                             textSleep.setText(formatSleepDuration(sleepMinutes));
