@@ -757,9 +757,7 @@ public class MyDashboard extends Fragment {
         textActive.setText(valueActive);
 
         final long totalSleepMinutes = myData1.getSleepMinutesTotal();
-        // Keep raw wearable minutes for e-ticket decisioning.
-        final long rawWearableSleep = myData1.sleepTotalMinutes;
-        localStorage.setSleepMinutes(rawWearableSleep);
+        localStorage.setSleepMinutes(myData1.sleepTotalMinutes);
         final String valueSleep = String.format(
                 Locale.ROOT,
                 "%d:%02d",
@@ -821,12 +819,11 @@ public class MyDashboard extends Fragment {
         );
         textYesterday.setText(sleepYesterday);
 
-        // Tampilkan raw total tidur wearable (tanpa logika capping/window)
         final String sleepWearable = String.format(
                 Locale.ROOT,
                 "%d jam, %02d menit",
-                (int) Math.floor(rawWearableSleep / 60f),
-                (int) (rawWearableSleep % 60f)
+                (int) Math.floor(myData1.sleepTotalMinutes / 60f),
+                (int) (myData1.sleepTotalMinutes % 60f)
         );
         textRest.setText(sleepWearable);
 
@@ -1514,11 +1511,11 @@ public class MyDashboard extends Fragment {
             myData1.activeMinutesTotal = 124;
             myData1.heartRate = 72;
             myData1.sleepToday = 420;
-            myData1.sleepYesterday = 390;
+            myData1.sleepYesterday = 60;
             myData1.sleepRest = 30;
             myData1.sleepFrom = (int) (System.currentTimeMillis() / 1000) - (8 * 3600);
             myData1.sleepTo = (int) (System.currentTimeMillis() / 1000) - (1 * 3600);
-            myData1.sleepTotalMinutes = 420;
+            myData1.sleepTotalMinutes = 480;
             myData1.lightSleepTotalMinutes = 240;
             myData1.deepSleepTotalMinutes = 180;
             myData1.remSleepTotalMinutes = 0;
@@ -3417,13 +3414,13 @@ public class MyDashboard extends Fragment {
                 myData1.activeMinutesTotal = 124;
                 myData1.heartRate = 72;
                 myData1.sleepToday = 420; // 7 hours
-                myData1.sleepYesterday = 390; // 6.5 hours
+                myData1.sleepYesterday = 60; // capped at 1 hour
                 myData1.sleepRest = 30; // 30 min
                 myData1.sleepFrom = (int) (System.currentTimeMillis() / 1000) - (8 * 3600); // 8 hours ago
                 myData1.sleepTo = (int) (System.currentTimeMillis() / 1000) - (1 * 3600); // 1 hour ago
                 
                 // Set sleep details (required for upload validation)
-                myData1.sleepTotalMinutes = 420; // 7 hours total
+                myData1.sleepTotalMinutes = 480; // today + capped yesterday
                 myData1.lightSleepTotalMinutes = 240; // 4 hours light
                 myData1.deepSleepTotalMinutes = 180; // 3 hours deep
                 myData1.remSleepTotalMinutes = 0;
@@ -3759,6 +3756,13 @@ public class MyDashboard extends Fragment {
             return new long[]{totalS[0], totalS[1], totalS[2], totalS[3], (totalT[0] + totalT[1] + totalT[2]), (totalY[0] + totalY[1] + totalY[2]), (totalR[0] + totalR[1] + totalR[2])};
         }
 
+        private long capYesterdaySleepMinutes(long minutes) {
+            if (minutes <= 0) {
+                return 0;
+            }
+            return Math.min(minutes, 60);
+        }
+
         private long getSleepMinutesTotal() {
             List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
             sleepTotalMinutes = 0;
@@ -3773,14 +3777,14 @@ public class MyDashboard extends Fragment {
                 GBDevice dev = getPrimaryActivityDevice(devices);
                 if (dev != null) {
                     long[] sleep = getSleep(dev, dbHandler);
-                    sleepTotalMinutes += (sleep[0] + sleep[1] + sleep[2] + sleep[3] + sleep[6]);
                     lightSleepTotalMinutes += sleep[0];
                     deepSleepTotalMinutes += sleep[1];
                     remSleepTotalMinutes += sleep[2];
                     awakeSleepTotalMinutes += sleep[3];
                     sleepToday += sleep[4];
-                    sleepYesterday += sleep[5];
+                    sleepYesterday += capYesterdaySleepMinutes(sleep[5]);
                     sleepRest += sleep[6];
+                    sleepTotalMinutes += sleep[4] + capYesterdaySleepMinutes(sleep[5]);
                 }
             } catch (Exception e) {
                 LOG.warn("Could not calculate total amount of sleep: ", e);
