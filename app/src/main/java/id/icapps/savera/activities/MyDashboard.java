@@ -3682,7 +3682,10 @@ public class MyDashboard extends Fragment {
 
                 ActivityAmounts amountToday = analysis.calculateActivityAmounts(provider.getAllActivitySamples(sleep2, sleep3));
                 totalT = getTotalsSleepForActivityAmounts(amountToday);
-                ActivityAmounts amountYesterday = analysis.calculateActivityAmounts(provider.getAllActivitySamples(sleep1, sleep2));
+                ActivityAmounts amountYesterday = analysis.calculateActivityAmounts(provider.getAllActivitySamples(
+                        sleep1 - (6 * 3600),
+                        sleep1
+                ));
                 totalY = getTotalsSleepForActivityAmounts(amountYesterday);
 
                 Calendar restStart = (Calendar) today.clone();
@@ -3710,6 +3713,11 @@ public class MyDashboard extends Fragment {
                 today.add(Calendar.HOUR, 6);
 
                 int sleep1 = (int) (today.getTimeInMillis() / 1000);
+                ActivityAmounts amountYesterday = analysis.calculateActivityAmounts(provider.getAllActivitySamples(
+                        sleep1 - (6 * 3600),
+                        sleep1
+                ));
+                totalY = getTotalsSleepForActivityAmounts(amountYesterday);
 
                 Calendar restStart = (Calendar) today.clone();
                 restStart.add(Calendar.DAY_OF_MONTH, -1);
