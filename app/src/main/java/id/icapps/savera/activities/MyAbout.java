@@ -1,6 +1,9 @@
 package id.icapps.savera.activities;
 
+import android.content.Context;
 import android.graphics.Color;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -17,11 +20,13 @@ import androidx.fragment.app.Fragment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import id.icapps.savera.LocalStorage;
 import id.icapps.savera.R;
 
 public class MyAbout extends Fragment {
     private static final Logger LOG = LoggerFactory.getLogger(MyAbout.class);
     private WebView webView;
+    private LocalStorage localStorage;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -47,12 +52,33 @@ public class MyAbout extends Fragment {
             }
         });
 
-        String html = "<html><head>"
+        localStorage = new LocalStorage(view.getContext());
+
+        webView = view.findViewById(R.id.webView);
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(false);
+        settings.setDomStorageEnabled(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
+        webView.setBackgroundColor(Color.TRANSPARENT);
+        webView.loadDataWithBaseURL(null, buildAboutHtml(), "text/html", "utf-8", null);
+
+        return view;
+    }
+
+    private String buildAboutHtml() {
+        NetworkStatus networkStatus = resolveNetworkStatus();
+
+        return "<html><head>"
             + "<meta name='viewport' content='width=device-width, initial-scale=1.0'/>"
             + "<style>"
             + "body{margin:0;background:#eef3f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#0f172a;}"
             + ".page{padding:16px 14px 110px 14px;}"
             + ".card{background:#ffffff;border-radius:16px;padding:16px;box-shadow:0 4px 18px rgba(15,23,42,.08);margin-bottom:12px;}"
+            + ".status-row{display:flex;gap:10px;margin-bottom:12px;}"
+            + ".status{flex:1;text-align:center;border-radius:999px;padding:10px 12px;font-size:14px;font-weight:800;}"
+            + ".ok{background:#EAF7EE;color:#1E6B3A;}"
+            + ".off{background:#FDEDED;color:#8A1C1C;}"
             + ".badge{display:inline-block;background:#dbeafe;color:#1d4ed8;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;margin-bottom:10px;}"
             + "h2{font-size:18px;line-height:1.35;margin:0 0 10px 0;color:#0b3a75;}"
             + "h3{font-size:15px;line-height:1.4;margin:0 0 8px 0;color:#102a43;}"
@@ -60,6 +86,10 @@ public class MyAbout extends Fragment {
             + "ul{margin:0 0 10px 18px;padding:0;}"
             + "li{font-size:14px;line-height:1.7;margin-bottom:6px;}"
             + "</style></head><body><div class='page'>"
+            + "<div class='status-row'>"
+            + "<div class='status " + (networkStatus.localConnected ? "ok" : "off") + "'>Local</div>"
+            + "<div class='status " + (networkStatus.publicConnected ? "ok" : "off") + "'>Public</div>"
+            + "</div>"
             + "<div class='card'>"
             + "<span class='badge'>Official Corporate Product</span>"
             + "<h2>Tentang Savera</h2>"
@@ -81,22 +111,57 @@ public class MyAbout extends Fragment {
             + "<p>Pelanggaran terhadap ketentuan ini dapat dikenakan tindakan disipliner internal serta langkah hukum perdata dan/atau pidana sesuai ketentuan peraturan perundang-undangan yang berlaku.</p>"
             + "</div>"
             + "</div></body></html>";
-        webView = view.findViewById(R.id.webView);
-        WebSettings settings = webView.getSettings();
-        settings.setJavaScriptEnabled(false);
-        settings.setDomStorageEnabled(false);
-        settings.setBuiltInZoomControls(false);
-        settings.setDisplayZoomControls(false);
-        webView.setBackgroundColor(Color.TRANSPARENT);
-        webView.loadDataWithBaseURL(null, html, "text/html", "utf-8", null);
+    }
 
-        return view;
+    private NetworkStatus resolveNetworkStatus() {
+        if (localStorage == null || !hasNetworkConnection()) {
+            return new NetworkStatus(false, false);
+        }
+
+        String localUrl = sanitizeUrl(localStorage.getApiLocalUrl());
+        String publicUrl = sanitizeUrl(localStorage.getApiPublicUrl());
+        String activeUrl = sanitizeUrl(localStorage.getApiActiveBaseUrl());
+
+        boolean localConnected = !localUrl.isEmpty() && !activeUrl.isEmpty() && activeUrl.startsWith(localUrl);
+        boolean publicConnected = !publicUrl.isEmpty() && !activeUrl.isEmpty() && activeUrl.startsWith(publicUrl);
+
+        return new NetworkStatus(localConnected, publicConnected);
+    }
+
+    private boolean hasNetworkConnection() {
+        Context context = getContext();
+        if (context == null) {
+            return false;
+        }
+
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) {
+            return false;
+        }
+
+        NetworkInfo netInfo = cm.getActiveNetworkInfo();
+        return netInfo != null && netInfo.isConnected();
+    }
+
+    private String sanitizeUrl(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        String normalized = value.trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+
+        return normalized;
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        if (webView != null) return;
+        if (webView != null) {
+            webView.loadDataWithBaseURL(null, buildAboutHtml(), "text/html", "utf-8", null);
+        }
     }
 
     @Override
@@ -106,5 +171,15 @@ public class MyAbout extends Fragment {
             webView = null;
         }
         super.onDestroy();
+    }
+
+    private static class NetworkStatus {
+        final boolean localConnected;
+        final boolean publicConnected;
+
+        NetworkStatus(boolean localConnected, boolean publicConnected) {
+            this.localConnected = localConnected;
+            this.publicConnected = publicConnected;
+        }
     }
 }

@@ -31,6 +31,8 @@ public class LocalStorage {
     private static final String KEY_FIT_4 = "FIT_4";
     private static final String KEY_FIT_5 = "FIT_5";
     private static final String KEY_LAST_SLEEP_SNAPSHOT = "LAST_SLEEP_SNAPSHOT";
+    private static final String KEY_NOTIFICATION_CACHE = "NOTIFICATION_CACHE";
+    private static final String KEY_NOTIFICATION_CACHE_SYNCED_AT = "NOTIFICATION_CACHE_SYNCED_AT";
 
     SharedPreferences sharedPreferences;
     SharedPreferences.Editor editor;
@@ -226,6 +228,34 @@ public class LocalStorage {
     public void setLastSleepSnapshotKey(String value) {
         editor.putString(KEY_LAST_SLEEP_SNAPSHOT, value == null ? "" : value);
         editor.commit();
+    }
+
+    public String getNotificationCache() {
+        String value = sharedPreferences.getString(KEY_NOTIFICATION_CACHE, "");
+        return value == null ? "" : value;
+    }
+
+    public long getNotificationCacheSyncedAt() {
+        return sharedPreferences.getLong(KEY_NOTIFICATION_CACHE_SYNCED_AT, 0L);
+    }
+
+    public void setNotificationCache(String responseJson) {
+        if (responseJson == null || responseJson.trim().isEmpty()) {
+            return;
+        }
+
+        editor.putString(KEY_NOTIFICATION_CACHE, responseJson);
+        editor.putLong(KEY_NOTIFICATION_CACHE_SYNCED_AT, System.currentTimeMillis());
+        editor.commit();
+    }
+
+    public boolean hasFreshNotificationCache(long maxAgeMs) {
+        if (maxAgeMs <= 0L) {
+            return false;
+        }
+
+        long syncedAt = getNotificationCacheSyncedAt();
+        return syncedAt > 0L && (System.currentTimeMillis() - syncedAt) <= maxAgeMs;
     }
 
     public boolean getAdmin() {

@@ -98,11 +98,11 @@ public class MyProfile extends Fragment {
         textUploadQueueDetail = view.findViewById(R.id.textUploadQueueDetail);
 
         if (textLocalSyncStatus != null) {
-            textLocalSyncStatus.setVisibility(View.VISIBLE);
+            textLocalSyncStatus.setVisibility(View.GONE);
         }
 
         if (textLocalSyncDetail != null) {
-            textLocalSyncDetail.setVisibility(View.VISIBLE);
+            textLocalSyncDetail.setVisibility(View.GONE);
         }
         if (textUploadQueueStatus != null) {
             textUploadQueueStatus.setVisibility(View.GONE);
@@ -1079,55 +1079,10 @@ public class MyProfile extends Fragment {
             return;
         }
 
-        String localUrl = sanitizeUrl(localStorage.getApiLocalUrl());
-        String activeUrl = sanitizeUrl(localStorage.getApiActiveBaseUrl());
-        String preferredRoute = localStorage.getApiPreferredRoute();
-        boolean hasLocalUrl = !localUrl.isEmpty();
-        boolean hasSyncedConfig = localStorage.hasSyncedApiConfig();
-        boolean activeLocal = hasLocalUrl && activeUrl.startsWith(localUrl);
-        boolean preferredLocal = "local".equalsIgnoreCase(preferredRoute);
-        boolean localSynced = hasLocalUrl && hasSyncedConfig && (activeLocal || preferredLocal);
-
-        textLocalSyncStatus.setVisibility(View.VISIBLE);
-        textLocalSyncDetail.setVisibility(View.VISIBLE);
-
-        if (localSynced) {
-            textLocalSyncStatus.setText(getString(R.string.profile_local_sync_ok));
-            textLocalSyncStatus.setBackgroundColor(Color.parseColor("#EAF7EE"));
-            textLocalSyncStatus.setTextColor(Color.parseColor("#1E6B3A"));
-
-            String activeLabel = activeUrl.isEmpty() ? "-" : activeUrl;
-            textLocalSyncDetail.setText(getString(R.string.profile_local_sync_detail, localUrl, activeLabel));
-            textLocalSyncDetail.setTextColor(Color.parseColor("#1E6B3A"));
-            return;
-        }
-
-        textLocalSyncStatus.setText(getString(R.string.profile_local_sync_not_ready));
-        textLocalSyncStatus.setBackgroundColor(Color.parseColor("#FDEDED"));
-        textLocalSyncStatus.setTextColor(Color.parseColor("#8A1C1C"));
-
-        if (!hasLocalUrl) {
-            textLocalSyncDetail.setText(getString(R.string.profile_local_sync_missing_local));
-        } else if (!hasSyncedConfig) {
-            textLocalSyncDetail.setText(getString(R.string.profile_local_sync_detail_unsynced));
-        } else {
-            String activeLabel = activeUrl.isEmpty() ? "-" : activeUrl;
-            textLocalSyncDetail.setText(getString(R.string.profile_local_sync_detail, localUrl, activeLabel));
-        }
-        textLocalSyncDetail.setTextColor(Color.parseColor("#8A1C1C"));
-    }
-
-    private String sanitizeUrl(String value) {
-        if (value == null) {
-            return "";
-        }
-
-        String normalized = value.trim();
-        while (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-
-        return normalized;
+        textLocalSyncStatus.setVisibility(View.GONE);
+        textLocalSyncDetail.setVisibility(View.GONE);
+        textLocalSyncStatus.setText("");
+        textLocalSyncDetail.setText("");
     }
 
     private boolean shouldRefreshProfileOnOpen() {

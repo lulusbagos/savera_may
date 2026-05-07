@@ -6,15 +6,14 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.ImageButton;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
+import android.widget.ImageButton;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -37,6 +36,7 @@ import id.icapps.savera.util.GB;
 public class NotificationActivity extends AppCompatActivity {
     private static final int MAX_RETRY = 2;
     private static final long RETRY_DELAY_MS = 2000L;
+    private static final long NOTIFICATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000L;
 
     private ProgressBar progress;
     private NestedScrollView scrollView;
@@ -44,6 +44,9 @@ public class NotificationActivity extends AppCompatActivity {
     private TextView textEmpty;
     private TextView textHeadline;
     private LocalStorage localStorage;
+    private boolean loadedOnce;
+    private boolean resumedOnce;
+    private boolean fetching;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,60 +69,107 @@ public class NotificationActivity extends AppCompatActivity {
         btnBack.setOnClickListener(v -> onBackPressed());
 
         ImageButton btnReload = findViewById(R.id.btnReload);
-        btnReload.setOnClickListener(v -> fetchNotifications());
+        btnReload.setOnClickListener(v -> fetchNotifications(true));
 
-        fetchNotifications();
+        loadedOnce = bindCachedNotifications(false);
+        fetchNotifications(false);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        fetchNotifications();
+        if (!resumedOnce) {
+            resumedOnce = true;
+            return;
+        }
+
+        if (!localStorage.hasFreshNotificationCache(NOTIFICATION_CACHE_MAX_AGE_MS)) {
+            fetchNotifications(false);
+        }
     }
 
-    private void fetchNotifications() {
-        fetchNotificationsWithRetry(0);
+    private void fetchNotifications(boolean forceNetwork) {
+        if (fetching) {
+            return;
+        }
+
+        if (!forceNetwork && localStorage.hasFreshNotificationCache(NOTIFICATION_CACHE_MAX_AGE_MS) && loadedOnce) {
+            return;
+        }
+
+        fetchNotificationsWithRetry(0, forceNetwork);
     }
 
-    private void fetchNotificationsWithRetry(int attempt) {
-        bindLoading(true);
+    private void fetchNotificationsWithRetry(int attempt, boolean forceNetwork) {
+        fetching = true;
+        bindLoading(!loadedOnce || forceNetwork);
         String url = getString(R.string.base_url) + "/notifications";
 
         new Thread(() -> {
             Http http = new Http(NotificationActivity.this, url);
             http.setMethod("get");
             http.setToken(true);
-            http.setBypassCache(true);
+            http.setBypassCache(forceNetwork);
+            http.setCacheTtlSeconds((int) (NOTIFICATION_CACHE_MAX_AGE_MS / 1000L));
             http.send();
 
             int code = http.getStatusCode() == null ? 0 : http.getStatusCode();
 
             if (code >= 500 && attempt < MAX_RETRY) {
                 try { Thread.sleep(RETRY_DELAY_MS * (attempt + 1)); } catch (InterruptedException ignored) {}
-                fetchNotificationsWithRetry(attempt + 1);
+                runOnUiThread(() -> fetchNotificationsWithRetry(attempt + 1, forceNetwork));
                 return;
             }
 
             runOnUiThread(() -> {
+                fetching = false;
                 bindLoading(false);
                 if (code == 200) {
                     try {
-                        JSONObject response = new JSONObject(http.getResponse());
+                        String responseBody = http.getResponse();
+                        JSONObject response = new JSONObject(responseBody);
                         JSONArray data = response.optJSONArray("data");
                         JSONObject meta = response.optJSONObject("meta");
+                        localStorage.setNotificationCache(responseBody);
                         bindNotifications(data, meta);
+                        loadedOnce = true;
                     } catch (JSONException e) {
-                        bindError(getString(R.string.notification_error_invalid_response));
+                        if (!bindCachedNotifications(true)) {
+                            bindError(getString(R.string.notification_error_invalid_response));
+                        }
                     }
                 } else if (code == 401) {
                     forceLogout();
                 } else if (code == 404) {
-                    bindError(getString(R.string.notification_error_context));
+                    if (!bindCachedNotifications(true)) {
+                        bindError(getString(R.string.notification_error_context));
+                    }
                 } else {
-                    bindHttpError(http, R.string.notification_error_load);
+                    if (!bindCachedNotifications(true)) {
+                        bindHttpError(http, R.string.notification_error_load);
+                    }
                 }
             });
         }).start();
+    }
+
+    private boolean bindCachedNotifications(boolean showToastOnInvalidCache) {
+        String cached = localStorage.getNotificationCache();
+        if (cached.trim().isEmpty()) {
+            return false;
+        }
+
+        try {
+            JSONObject response = new JSONObject(cached);
+            bindNotifications(response.optJSONArray("data"), response.optJSONObject("meta"));
+            loadedOnce = true;
+            return true;
+        } catch (JSONException e) {
+            if (showToastOnInvalidCache) {
+                toast(this, getString(R.string.notification_error_invalid_response), Toast.LENGTH_SHORT, GB.ERROR);
+            }
+            return false;
+        }
     }
 
     private void bindNotifications(JSONArray rows, JSONObject meta) {
@@ -193,14 +243,14 @@ public class NotificationActivity extends AppCompatActivity {
         card.addView(date);
 
         WebView body = new WebView(this);
-        configureNotificationWebView(body);
         LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                dp(80)
         );
         bodyParams.topMargin = dp(10);
         body.setLayoutParams(bodyParams);
-        body.loadDataWithBaseURL(null, resolveNotificationBodyDocument(row), "text/html", "UTF-8", null);
+        configureNotificationWebView(body);
+        body.loadDataWithBaseURL(null, buildNotificationHtml(row), "text/html", "UTF-8", null);
         card.addView(body);
 
         final int notificationId = row.optInt("id", 0);
@@ -214,13 +264,9 @@ public class NotificationActivity extends AppCompatActivity {
 
     private void configureNotificationWebView(WebView webView) {
         webView.setBackgroundColor(Color.TRANSPARENT);
-        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         webView.setVerticalScrollBarEnabled(false);
         webView.setHorizontalScrollBarEnabled(false);
-        webView.setFocusable(false);
-        webView.setFocusableInTouchMode(false);
-        webView.setLongClickable(false);
-        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(false);
@@ -230,39 +276,27 @@ public class NotificationActivity extends AppCompatActivity {
         settings.setAllowContentAccess(false);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(false);
-        settings.setTextZoom(100);
-        settings.setSupportZoom(false);
-        settings.setBuiltInZoomControls(false);
-        settings.setDisplayZoomControls(false);
+        settings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+        settings.setDefaultTextEncodingName("UTF-8");
 
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                view.postDelayed(() -> {
+                    int contentHeight = Math.max(dp(40), Math.round(view.getContentHeight() * view.getScale()));
+                    LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) view.getLayoutParams();
+                    if (params.height != contentHeight) {
+                        params.height = contentHeight;
+                        view.setLayoutParams(params);
+                    }
+                }, 60);
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 return true;
             }
-
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return true;
-            }
-
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                resizeWebViewToContent(view);
-            }
         });
-    }
-
-    private void resizeWebViewToContent(WebView webView) {
-        webView.postDelayed(() -> {
-            int contentHeight = (int) Math.ceil(webView.getContentHeight() * webView.getScale());
-            int targetHeight = Math.max(dp(72), contentHeight + dp(8));
-
-            if (webView.getLayoutParams() != null && webView.getLayoutParams().height != targetHeight) {
-                webView.getLayoutParams().height = targetHeight;
-                webView.requestLayout();
-            }
-        }, 150L);
     }
 
     private void markReadIfNeeded(int id, int currentStatus, TextView statusView) {
@@ -281,9 +315,9 @@ public class NotificationActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 int code = http.getStatusCode() == null ? 0 : http.getStatusCode();
                 if (code == 200) {
+                    markCachedNotificationRead(id);
                     statusView.setText(getString(R.string.notification_status_read));
                     statusView.setTextColor(Color.parseColor("#0C8A03"));
-                    fetchNotifications();
                 } else if (code == 401) {
                     forceLogout();
                 } else if (code == 404) {
@@ -291,6 +325,40 @@ public class NotificationActivity extends AppCompatActivity {
                 }
             });
         }).start();
+    }
+
+    private void markCachedNotificationRead(int id) {
+        String cached = localStorage.getNotificationCache();
+        if (cached.trim().isEmpty()) {
+            return;
+        }
+
+        try {
+            JSONObject response = new JSONObject(cached);
+            JSONArray data = response.optJSONArray("data");
+            boolean changed = false;
+
+            if (data != null) {
+                for (int i = 0; i < data.length(); i++) {
+                    JSONObject item = data.optJSONObject(i);
+                    if (item != null && item.optInt("id", 0) == id && item.optInt("status", 0) == 0) {
+                        item.put("status", 1);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+
+            if (changed) {
+                JSONObject meta = response.optJSONObject("meta");
+                if (meta != null) {
+                    meta.put("unread_count", Math.max(0, meta.optInt("unread_count", 0) - 1));
+                }
+                localStorage.setNotificationCache(response.toString());
+                bindCachedNotifications(false);
+            }
+        } catch (JSONException ignored) {
+        }
     }
 
     private void forceLogout() {
@@ -322,43 +390,49 @@ public class NotificationActivity extends AppCompatActivity {
         toast(this, message, Toast.LENGTH_SHORT, GB.ERROR);
     }
 
-    private String resolveNotificationBodyDocument(JSONObject row) {
+    private String buildNotificationHtml(JSONObject row) {
         String fullHtml = row.optString("message_html_full", "").trim();
         if (!fullHtml.isEmpty()) {
-            return fullHtml;
+            return wrapNotificationHtml(fullHtml);
         }
 
         String html = row.optString("message_html", "").trim();
         if (!html.isEmpty()) {
-            return buildNotificationHtmlDocument(html);
+            return wrapNotificationHtml(html);
         }
 
         String plain = row.optString("message", "").trim();
         if (!plain.isEmpty()) {
-            return buildNotificationHtmlDocument("<p>" + escapeHtml(plain) + "</p>");
+            return wrapNotificationHtml("<p>" + escapeHtml(plain) + "</p>");
         }
 
-        return buildNotificationHtmlDocument("<p>-</p>");
+        return wrapNotificationHtml("<p>-</p>");
     }
 
-    private String buildNotificationHtmlDocument(String bodyHtml) {
-        String safeBody = (bodyHtml == null || bodyHtml.isBlank()) ? "<p>-</p>" : bodyHtml;
-        if (safeBody.toLowerCase(Locale.US).contains("<html")) {
-            return safeBody;
+    private String wrapNotificationHtml(String html) {
+        if (html == null || html.trim().isEmpty()) {
+            html = "<p>-</p>";
+        }
+
+        String sanitized = stripScripts(html);
+        if (sanitized.matches("(?is).*<html[\\s>].*")) {
+            return sanitized;
         }
 
         return "<!doctype html><html><head>"
-                + "<meta charset=\"utf-8\">"
-                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1\">"
+                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
                 + "<style>"
-                + "*{box-sizing:border-box}html,body{margin:0;padding:0;background:transparent;color:#0f172a;"
-                + "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:13px;line-height:1.45}"
-                + "body{overflow:hidden}.savera-notification{width:100%;padding:0}.sn-card{border:1px solid #bfdbfe;border-radius:18px;"
-                + "padding:14px;background:linear-gradient(135deg,#ffffff 0%,#eff6ff 100%);box-shadow:0 14px 28px rgba(15,23,42,.08)}"
-                + ".sn-rich p{margin:0 0 10px}.sn-rich a{color:#0369a1;font-weight:700;text-decoration:none}"
-                + ".sn-rich table{width:100%;border-collapse:collapse;margin:8px 0}.sn-rich th,.sn-rich td{border:1px solid #e2e8f0;padding:8px;text-align:left}"
-                + ".sn-rich img{max-width:100%;height:auto;border-radius:12px}"
-                + "</style></head><body>" + safeBody + "</body></html>";
+                + "html,body{margin:0;padding:0;background:transparent;color:#0F172A;font-family:sans-serif;font-size:13px;line-height:1.35;}"
+                + "p{margin:0 0 8px;} img,video{max-width:100%;height:auto;} table{max-width:100%;border-collapse:collapse;}"
+                + "*{box-sizing:border-box;}"
+                + "</style>"
+                + "</head><body>"
+                + sanitized
+                + "</body></html>";
+    }
+
+    private String stripScripts(String html) {
+        return html.replaceAll("(?is)<script.*?</script>", "");
     }
 
     private String escapeHtml(String value) {

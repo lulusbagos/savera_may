@@ -500,10 +500,10 @@ public class LoginActivity extends AppCompatActivity {
                 }
             }
 
-            JSONObject companyObj = employeeObj.optJSONObject("company");
-            if (companyObj != null) {
+            JSONObject employeeCompanyObj = employeeObj.optJSONObject("company");
+            if (employeeCompanyObj != null) {
                 for (String key : new String[]{"code", "company_code", "tenant_code", "name"}) {
-                    String value = companyObj.optString(key, "").trim();
+                    String value = employeeCompanyObj.optString(key, "").trim();
                     if (!value.isEmpty()) {
                         return value.toUpperCase(Locale.ROOT);
                     }

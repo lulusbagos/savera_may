@@ -112,6 +112,7 @@ import id.icapps.savera.model.ActivityUser;
 import id.icapps.savera.model.DeviceType;
 import id.icapps.savera.model.DailyTotals;
 import id.icapps.savera.model.HeartRateSample;
+import id.icapps.savera.model.RecordedDataTypes;
 import id.icapps.savera.model.Spo2Sample;
 import id.icapps.savera.model.StressSample;
 import id.icapps.savera.service.devices.xiaomi.activity.XiaomiActivityFileId;
@@ -208,8 +209,11 @@ public class MyDashboard extends Fragment {
     private static final int SERVER_STATUS_DISCONNECTED = 3;
     private static final int HEART_RATE_VALID_MIN = 1;
     private static final int HEART_RATE_VALID_MAX = 240;
+    private static final long RECORDED_DATA_FETCH_COOLDOWN_MS = 60 * 1000L;
     private static final Pattern APP_VERSION_STAMP_PATTERN = Pattern.compile("^Savera X \\d+(?:\\.\\d+){1,2}$");
     private static boolean queueResetOnLaunch = false;
+    private long lastRecordedDataFetchMs = 0L;
+    private boolean recordedDataFetchPending = false;
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -413,8 +417,7 @@ public class MyDashboard extends Fragment {
                         .setNegativeButton("Batal", null)
                         .show();
                 } else {
-                    // No pending uploads, do screenshot
-                    take_share_screenshot(getActivity(), true);
+                    reloadData(view);
                 }
             }
         });
@@ -835,6 +838,7 @@ public class MyDashboard extends Fragment {
         List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
         GBDevice activeDevice = resolvePrimaryWearableDevice();
         if (activeDevice != null) {
+            triggerRecordedDataFetch(activeDevice, false);
             textDevice.setText(": " + activeDevice.getName());
             textOperator.setText(": -");
 
@@ -1119,7 +1123,7 @@ public class MyDashboard extends Fragment {
                     obj.put("lightSleepDuration", light);
                     obj.put("deepSleepDuration", deep);
                     obj.put("remSleepDuration", rem);
-                    obj.put("totalSleepDuration", (light + deep + rem));
+                    obj.put("totalSleepDuration", (light + deep + rem + awake));
                     obj.put("awakeSleepDuration", awake);
                     jsonSleep.put(obj);
                 }
@@ -1663,9 +1667,9 @@ public class MyDashboard extends Fragment {
                                JSONObject summaryResp = new JSONObject(http.getResponse());
                                lastSummaryId = summaryResp.optInt("id", summaryResp.optInt("summary_id", 0));
                                if (lastSummaryId <= 0) {
-                                   JSONObject summaryData = summaryResp.optJSONObject("data");
-                                   if (summaryData != null) {
-                                       lastSummaryId = summaryData.optInt("summary_id", summaryData.optInt("id", 0));
+                                   JSONObject summaryPayload = summaryResp.optJSONObject("data");
+                                   if (summaryPayload != null) {
+                                       lastSummaryId = summaryPayload.optInt("summary_id", summaryPayload.optInt("id", 0));
                                    }
                                }
                             toast(requireActivity(), "Success send activity summary", Toast.LENGTH_SHORT, GB.INFO);
@@ -3161,18 +3165,61 @@ public class MyDashboard extends Fragment {
         anim.setRepeatMode(Animation.REVERSE);
         btnReload.startAnimation(anim);
 
-        List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
         GBDevice activeDevice = resolvePrimaryWearableDevice();
         if (activeDevice != null) {
-            if (!activeDevice.isConnected()) {
-                GBApplication.deviceService(activeDevice).connect();
-            }
             Calendar today = GregorianCalendar.getInstance();
             now = (Calendar) today.clone();
+            boolean fetchStarted = triggerRecordedDataFetch(activeDevice, true);
             refresh();
+            if (fetchStarted) {
+                queueWaitHandler.postDelayed(this::refresh, 15000L);
+            }
         } else {
             toast(requireActivity(), "Device not found", Toast.LENGTH_SHORT, GB.ERROR);
         }
+    }
+
+    private boolean triggerRecordedDataFetch(GBDevice device, boolean force) {
+        if (device == null || device.getDeviceCoordinator() == null || !device.getDeviceCoordinator().supportsActivityTracking()) {
+            return false;
+        }
+
+        long nowMs = System.currentTimeMillis();
+        if (!force && nowMs - lastRecordedDataFetchMs < RECORDED_DATA_FETCH_COOLDOWN_MS) {
+            return false;
+        }
+
+        lastRecordedDataFetchMs = nowMs;
+        if (!device.isConnected()) {
+            if (recordedDataFetchPending) {
+                return true;
+            }
+            recordedDataFetchPending = true;
+            GBApplication.deviceService(device).connect();
+            scheduleRecordedDataFetchWhenReady(device, 0);
+            return true;
+        }
+
+        GBApplication.deviceService(device).onFetchRecordedData(RecordedDataTypes.TYPE_SYNC);
+        return true;
+    }
+
+    private void scheduleRecordedDataFetchWhenReady(GBDevice device, int attempt) {
+        final long[] delaysMs = new long[]{3000L, 8000L, 15000L};
+        if (attempt >= delaysMs.length) {
+            recordedDataFetchPending = false;
+            return;
+        }
+
+        queueWaitHandler.postDelayed(() -> {
+            if (device != null && (device.isConnected() || device.isInitialized())) {
+                recordedDataFetchPending = false;
+                GBApplication.deviceService(device).onFetchRecordedData(RecordedDataTypes.TYPE_SYNC);
+                return;
+            }
+
+            scheduleRecordedDataFetchWhenReady(device, attempt + 1);
+        }, delaysMs[attempt]);
     }
 
     private void showImage() {
@@ -3726,7 +3773,7 @@ public class MyDashboard extends Fragment {
                 GBDevice dev = getPrimaryActivityDevice(devices);
                 if (dev != null) {
                     long[] sleep = getSleep(dev, dbHandler);
-                    sleepTotalMinutes += (sleep[0] + sleep[1] + sleep[2] + sleep[6]);
+                    sleepTotalMinutes += (sleep[0] + sleep[1] + sleep[2] + sleep[3] + sleep[6]);
                     lightSleepTotalMinutes += sleep[0];
                     deepSleepTotalMinutes += sleep[1];
                     remSleepTotalMinutes += sleep[2];
