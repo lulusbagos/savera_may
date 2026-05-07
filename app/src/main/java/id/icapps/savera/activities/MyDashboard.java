@@ -738,7 +738,10 @@ public class MyDashboard extends Fragment {
         textActive.setText(valueActive);
 
         final long totalSleepMinutes = myData1.getSleepMinutesTotal();
-        localStorage.setSleepMinutes(myData1.sleepTotalMinutes);
+        final long totalWearableSleepMinutes = myData1.sleepWearableTotalMinutes > 0
+                ? myData1.sleepWearableTotalMinutes
+                : myData1.sleepTotalMinutes;
+        localStorage.setSleepMinutes(totalWearableSleepMinutes);
         final String valueSleep = String.format(
                 Locale.ROOT,
                 "%d:%02d",
@@ -803,8 +806,8 @@ public class MyDashboard extends Fragment {
         final String sleepWearable = String.format(
                 Locale.ROOT,
                 "%d jam, %02d menit",
-                (int) Math.floor(myData1.sleepTotalMinutes / 60f),
-                (int) (myData1.sleepTotalMinutes % 60f)
+                (int) Math.floor(totalWearableSleepMinutes / 60f),
+                (int) (totalWearableSleepMinutes % 60f)
         );
         textRest.setText(sleepWearable);
 
@@ -1501,6 +1504,7 @@ public class MyDashboard extends Fragment {
             myData1.deepSleepTotalMinutes = 180;
             myData1.remSleepTotalMinutes = 0;
             myData1.awakeSleepTotalMinutes = 0;
+            myData1.sleepWearableTotalMinutes = myData1.sleepTotalMinutes + myData1.awakeSleepTotalMinutes;
             
             myData2.stepsTotal = 7823;
             myData2.activeMinutesTotal = 98;
@@ -3419,6 +3423,7 @@ public class MyDashboard extends Fragment {
                 myData1.deepSleepTotalMinutes = 180; // 3 hours deep
                 myData1.remSleepTotalMinutes = 0;
                 myData1.awakeSleepTotalMinutes = 0;
+                myData1.sleepWearableTotalMinutes = myData1.sleepTotalMinutes + myData1.awakeSleepTotalMinutes;
 
                 // Populate myData2 (yesterday) with sample data
                 myData2.stepsTotal = 7823;
@@ -3530,6 +3535,7 @@ public class MyDashboard extends Fragment {
         private int stepsTotal;
         private float stepsGoalFactor;
         private long sleepTotalMinutes;
+        private long sleepWearableTotalMinutes;
         private float sleepGoalFactor;
         private float distanceTotalMeters;
         private float distanceGoalFactor;
@@ -3553,6 +3559,7 @@ public class MyDashboard extends Fragment {
             stepsTotal = 0;
             stepsGoalFactor = 0;
             sleepTotalMinutes = 0;
+            sleepWearableTotalMinutes = 0;
             sleepGoalFactor = 0;
             sleepType = "night";
             distanceTotalMeters = 0;
@@ -3579,6 +3586,7 @@ public class MyDashboard extends Fragment {
             return (stepsTotal == 0 &&
                     stepsGoalFactor == 0 &&
                     sleepTotalMinutes == 0 &&
+                    sleepWearableTotalMinutes == 0 &&
                     sleepGoalFactor == 0 &&
                     distanceTotalMeters == 0 &&
                     distanceGoalFactor == 0 &&
@@ -3768,6 +3776,7 @@ public class MyDashboard extends Fragment {
         private long getSleepMinutesTotal() {
             List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
             sleepTotalMinutes = 0;
+            sleepWearableTotalMinutes = 0;
             lightSleepTotalMinutes = 0;
             deepSleepTotalMinutes = 0;
             remSleepTotalMinutes = 0;
@@ -3786,7 +3795,9 @@ public class MyDashboard extends Fragment {
                     sleepToday += sleep[4];
                     sleepYesterday += capYesterdaySleepMinutes(sleep[5]);
                     sleepRest += sleep[6];
-                    sleepTotalMinutes += sleep[4] + capYesterdaySleepMinutes(sleep[5]);
+                    long sleepWithoutAwake = sleep[4] + capYesterdaySleepMinutes(sleep[5]);
+                    sleepTotalMinutes += sleepWithoutAwake;
+                    sleepWearableTotalMinutes += sleepWithoutAwake + sleep[3];
                 }
             } catch (Exception e) {
                 LOG.warn("Could not calculate total amount of sleep: ", e);
