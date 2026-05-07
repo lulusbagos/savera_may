@@ -138,6 +138,7 @@ import id.icapps.savera.service.devices.huami.operations.fetch.FetchHeartRateRes
 import id.icapps.savera.service.devices.huami.operations.fetch.FetchPaiOperation;
 import id.icapps.savera.service.devices.huami.operations.fetch.FetchSleepRespiratoryRateOperation;
 import id.icapps.savera.service.devices.huami.operations.fetch.FetchSpo2NormalOperation;
+import id.icapps.savera.service.devices.huami.operations.fetch.FetchSpo2SleepOperation;
 import id.icapps.savera.service.devices.huami.operations.fetch.FetchSportsSummaryOperation;
 import id.icapps.savera.service.devices.huami.operations.fetch.FetchStressAutoOperation;
 import id.icapps.savera.service.devices.huami.operations.fetch.FetchStressManualOperation;
@@ -1676,6 +1677,7 @@ public abstract class HuamiSupport extends AbstractBTLEDeviceSupport implements 
 
         if ((dataTypes & RecordedDataTypes.TYPE_SPO2) != 0 && coordinator.supportsSpo2(gbDevice)) {
             this.fetchOperationQueue.add(new FetchSpo2NormalOperation(this));
+            this.fetchOperationQueue.add(new FetchSpo2SleepOperation(this));
         }
 
         if (ZeppOsCoordinator.experimentalFeatures(getDevice())) {

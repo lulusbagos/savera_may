@@ -3918,24 +3918,38 @@ public class MyDashboard extends Fragment {
             try (DBHandler dbHandler = GBApplication.acquireDB()) {
                 GBDevice dev = getPrimaryActivityDevice(devices);
                 if (dev != null) {
-                    DeviceCoordinator coordinator = dev.getDeviceCoordinator();
-                    if (coordinator.supportsStressMeasurement()) {
-                        TimeSampleProvider<? extends StressSample> stressProvider = coordinator.getStressSampleProvider(dev, dbHandler.getDaoSession());
-                        List<? extends StressSample> stressSample = stressProvider.getAllSamples(timeFrom * 1000L, timeTo * 1000L);
-                        int strs = 0;
-                        for (StressSample row : stressSample) {
-                            if (row.getStress() > 0) {
-                                strs = row.getStress();
-                            }
-                        }
-                        stress += strs;
+                    int stressValue = getLatestStress(dev, dbHandler, getSleepMetricRangeFromMillis(), getSleepMetricRangeToMillis());
+                    if (stressValue == 0) {
+                        stressValue = getLatestStress(dev, dbHandler, timeFrom * 1000L, timeTo * 1000L);
                     }
+                    stress += stressValue;
                 }
             } catch (Exception e) {
                 LOG.warn("Could not calculate total stress: ", e);
             }
             if (stress == 0) return "-";
             return stress + " " + getStressType(stress, new int[]{1, 30, 60, 80});
+        }
+
+        private int getLatestStress(GBDevice dev, DBHandler dbHandler, long fromMillis, long toMillis) {
+            if (dev == null || fromMillis <= 0 || toMillis <= fromMillis) {
+                return 0;
+            }
+
+            DeviceCoordinator coordinator = dev.getDeviceCoordinator();
+            if (coordinator == null || !coordinator.supportsStressMeasurement()) {
+                return 0;
+            }
+
+            TimeSampleProvider<? extends StressSample> stressProvider = coordinator.getStressSampleProvider(dev, dbHandler.getDaoSession());
+            List<? extends StressSample> stressSamples = stressProvider.getAllSamples(fromMillis, toMillis);
+            int stressValue = 0;
+            for (StressSample row : stressSamples) {
+                if (row.getStress() > 0) {
+                    stressValue = row.getStress();
+                }
+            }
+            return stressValue;
         }
 
         private String getStressType(final int stress, final int[] stressRanges) {
@@ -3958,23 +3972,47 @@ public class MyDashboard extends Fragment {
             try (DBHandler dbHandler = GBApplication.acquireDB()) {
                 GBDevice dev = getPrimaryActivityDevice(devices);
                 if (dev != null) {
-                    DeviceCoordinator coordinator = dev.getDeviceCoordinator();
-                    if (coordinator.supportsSpo2(dev)) {
-                        TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(dev, dbHandler.getDaoSession());
-                        List<? extends Spo2Sample> spo2Sample = spo2Provider.getAllSamples(timeFrom * 1000L, timeTo * 1000L);
-                        int spo2 = 0;
-                        for (Spo2Sample row : spo2Sample) {
-                            if (row.getSpo2() > 0) {
-                                spo2 = row.getSpo2();
-                            }
-                        }
-                        bloodOxygen += spo2;
+                    int spo2Value = getLatestBloodOxygen(dev, dbHandler, getSleepMetricRangeFromMillis(), getSleepMetricRangeToMillis());
+                    if (spo2Value == 0) {
+                        spo2Value = getLatestBloodOxygen(dev, dbHandler, timeFrom * 1000L, timeTo * 1000L);
                     }
+                    bloodOxygen += spo2Value;
                 }
             } catch (Exception e) {
                 LOG.warn("Could not calculate total blood oxygen: ", e);
             }
             return bloodOxygen;
+        }
+
+        private int getLatestBloodOxygen(GBDevice dev, DBHandler dbHandler, long fromMillis, long toMillis) {
+            if (dev == null || fromMillis <= 0 || toMillis <= fromMillis) {
+                return 0;
+            }
+
+            DeviceCoordinator coordinator = dev.getDeviceCoordinator();
+            if (coordinator == null || !coordinator.supportsSpo2(dev)) {
+                return 0;
+            }
+
+            TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(dev, dbHandler.getDaoSession());
+            List<? extends Spo2Sample> spo2Samples = spo2Provider.getAllSamples(fromMillis, toMillis);
+            int spo2Value = 0;
+            for (Spo2Sample row : spo2Samples) {
+                if (row.getSpo2() > 0) {
+                    spo2Value = row.getSpo2();
+                }
+            }
+            return spo2Value;
+        }
+
+        private long getSleepMetricRangeFromMillis() {
+            int rangeFrom = sleepFrom > 0 ? sleepFrom : timeFrom;
+            return rangeFrom * 1000L;
+        }
+
+        private long getSleepMetricRangeToMillis() {
+            int rangeTo = sleepTo > 0 ? sleepTo : timeTo;
+            return rangeTo * 1000L;
         }
 
         private int getBloodPressure() {
