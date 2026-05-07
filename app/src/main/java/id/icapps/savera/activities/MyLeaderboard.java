@@ -368,19 +368,22 @@ public class MyLeaderboard extends Fragment {
             Calendar date = Calendar.getInstance();
             date.setTimeInMillis(entry.timestamp);
             textDate.setText(labelDateFormat.format(date.getTime()));
-            textItemName.setVisibility(View.GONE);
-            textItemNik.setVisibility(View.GONE);
+            textItemName.setVisibility(View.VISIBLE);
+            textItemNik.setVisibility(View.VISIBLE);
+            textItemName.setText(employeeName != null && !employeeName.isEmpty() ? employeeName : "-");
+            textItemNik.setText("NIK: " + (employeeCode != null && !employeeCode.isEmpty() ? employeeCode : "-"));
             long sleepMinutes = Math.max(0, entry.sleepMinutes);
             long rawDelta = TARGET_SLEEP_MINUTES - sleepMinutes;
             long debtMinutes = Math.max(0, rawDelta);
-            textSleep.setText("Tidur: " + formatMinutes(sleepMinutes) + " / Target 7 jam");
+            long paidMinutes = Math.min(TARGET_SLEEP_MINUTES, sleepMinutes);
+            textSleep.setText("Target: 7 jam | Tidur: " + formatMinutes(sleepMinutes) + " | Terbayar: " + formatMinutes(paidMinutes));
 
             if (rawDelta > 0) {
-                textDebt.setText("Hutang: " + formatMinutes(debtMinutes));
+                textDebt.setText("Hutang: 7 jam - " + formatMinutes(sleepMinutes) + " = " + formatMinutes(debtMinutes));
                 textDebt.setTextColor(Color.parseColor("#B91C1C"));
             } else {
                 long extraMinutes = Math.abs(rawDelta);
-                textDebt.setText(extraMinutes > 0 ? "Lunas (Lebih " + formatMinutes(extraMinutes) + ")" : "Lunas");
+                textDebt.setText("Hutang: 7 jam - " + formatMinutes(sleepMinutes) + " = 0 menit" + (extraMinutes > 0 ? " (Lebih " + formatMinutes(extraMinutes) + ")" : " (Pas Target)"));
                 textDebt.setTextColor(Color.BLACK);
             }
             listView.addView(itemView);
