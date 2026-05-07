@@ -117,8 +117,6 @@ public class MyLeaderboard extends Fragment {
         });
 
         ImageButton btnShare = view.findViewById(R.id.btnShare);
-        TextView textShareLabel = view.findViewById(R.id.textShareLabel);
-        View shareContainer = view.findViewById(R.id.shareContainer);
 
         View.OnClickListener shareListener = new View.OnClickListener() {
             @Override
@@ -127,8 +125,6 @@ public class MyLeaderboard extends Fragment {
             }
         };
         btnShare.setOnClickListener(shareListener);
-        textShareLabel.setOnClickListener(shareListener);
-        shareContainer.setOnClickListener(shareListener);
 
         ImageButton btnDownload = view.findViewById(R.id.btnDownload);
         btnDownload.setOnClickListener(new View.OnClickListener() {
@@ -291,7 +287,7 @@ public class MyLeaderboard extends Fragment {
 
         ActivityAmounts amounts = analysis.calculateActivityAmounts(samples);
         long[] totals = DailyTotals.getTotalsSleepForActivityAmounts(amounts);
-        return totals[0] + totals[1] + totals[2];
+        return totals[0] + totals[1] + totals[2] + totals[3];
     }
 
     private boolean isSameDay(Calendar a, Calendar b) {
@@ -340,10 +336,10 @@ public class MyLeaderboard extends Fragment {
             textTotal.setText(formatMinutes(totalDebtBalance));
             textTotal.setTextColor(Color.parseColor("#B91C1C"));
         } else if (totalDebtBalance < 0) {
-            textTotal.setText("0 menit (Lebih " + formatMinutes(Math.abs(totalDebtBalance)) + ")");
+            textTotal.setText("0 menit");
             textTotal.setTextColor(Color.BLACK);
         } else {
-            textTotal.setText("0 menit (Pas Target)");
+            textTotal.setText("0 menit");
             textTotal.setTextColor(Color.BLACK);
         }
         textAverage.setText(formatMinutes(avgSleep));
@@ -372,20 +368,19 @@ public class MyLeaderboard extends Fragment {
             Calendar date = Calendar.getInstance();
             date.setTimeInMillis(entry.timestamp);
             textDate.setText(labelDateFormat.format(date.getTime()));
-            textItemName.setText(employeeName != null && !employeeName.isEmpty() ? employeeName : "-");
-            textItemNik.setText("NIK: " + (employeeCode != null && !employeeCode.isEmpty() ? employeeCode : "-"));
+            textItemName.setVisibility(View.GONE);
+            textItemNik.setVisibility(View.GONE);
             long sleepMinutes = Math.max(0, entry.sleepMinutes);
             long rawDelta = TARGET_SLEEP_MINUTES - sleepMinutes;
             long debtMinutes = Math.max(0, rawDelta);
-            long paidMinutes = Math.min(TARGET_SLEEP_MINUTES, Math.max(0, entry.sleepMinutes));
-            textSleep.setText("Target: 7 jam | Tidur: " + formatMinutes(sleepMinutes) + " | Terbayar: " + formatMinutes(paidMinutes));
+            textSleep.setText("Tidur: " + formatMinutes(sleepMinutes) + " / Target 7 jam");
 
             if (rawDelta > 0) {
-                textDebt.setText("Hutang: 7 jam - " + formatMinutes(sleepMinutes) + " = " + formatMinutes(debtMinutes));
+                textDebt.setText("Hutang: " + formatMinutes(debtMinutes));
                 textDebt.setTextColor(Color.parseColor("#B91C1C"));
             } else {
                 long extraMinutes = Math.abs(rawDelta);
-                textDebt.setText("Hutang: 7 jam - " + formatMinutes(sleepMinutes) + " = 0 menit" + (extraMinutes > 0 ? " (Lebih " + formatMinutes(extraMinutes) + ")" : " (Pas Target)"));
+                textDebt.setText(extraMinutes > 0 ? "Lunas (Lebih " + formatMinutes(extraMinutes) + ")" : "Lunas");
                 textDebt.setTextColor(Color.BLACK);
             }
             listView.addView(itemView);
@@ -490,10 +485,17 @@ public class MyLeaderboard extends Fragment {
     }
 
     private void take_share_screenshot(Context context, boolean share) {
-        final LinearLayout layout = getView().findViewById(R.id.my_leaderboard);
         final LinearLayout layoutInner = getView().findViewById(R.id.my_leaderboard_inner);
         int width = layoutInner.getWidth();
-        int height = layout.getHeight();
+        int height = Math.max(layoutInner.getHeight(), layoutInner.getMeasuredHeight());
+        if (width <= 0 || height <= 0) {
+            int widthSpec = View.MeasureSpec.makeMeasureSpec(getResources().getDisplayMetrics().widthPixels, View.MeasureSpec.EXACTLY);
+            int heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+            layoutInner.measure(widthSpec, heightSpec);
+            width = layoutInner.getMeasuredWidth();
+            height = layoutInner.getMeasuredHeight();
+            layoutInner.layout(0, 0, width, height);
+        }
         Bitmap screenShot = getScreenShot(layoutInner, width, height, context);
         String fileName = FileUtils.makeValidFileName("Screenshot-" + "DebtSleep-" + DateTimeUtils.formatIso8601(new Date(Calendar.getInstance().getTimeInMillis())) + ".png");
 
