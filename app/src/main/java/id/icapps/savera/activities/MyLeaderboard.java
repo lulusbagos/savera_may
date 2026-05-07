@@ -287,7 +287,7 @@ public class MyLeaderboard extends Fragment {
 
         ActivityAmounts amounts = analysis.calculateActivityAmounts(samples);
         long[] totals = DailyTotals.getTotalsSleepForActivityAmounts(amounts);
-        return totals[0] + totals[1] + totals[2] + totals[3];
+        return totals[0] + totals[1] + totals[2];
     }
 
     private boolean isSameDay(Calendar a, Calendar b) {
