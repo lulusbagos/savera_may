@@ -815,6 +815,42 @@ public class MySleep extends Fragment {
             return provider.getAllActivitySamples(timeFrom, timeTo);
         }
 
+        private List<? extends ActivitySample> getSleepChartSamples(DBHandler db, GBDevice device) {
+            SampleProvider<? extends ActivitySample> provider = getProvider(db, device);
+            int[] range = getSleepChartRange();
+            return provider.getAllActivitySamples(range[0], range[1] + 3600);
+        }
+
+        private int[] getSleepChartRange() {
+            Calendar today = GregorianCalendar.getInstance();
+            int hour = today.get(Calendar.HOUR_OF_DAY);
+            today.setTimeInMillis(timeTo * 1000L);
+            today.set(Calendar.HOUR_OF_DAY, 0);
+            today.set(Calendar.MINUTE, 0);
+            today.set(Calendar.SECOND, 0);
+            today.set(Calendar.MILLISECOND, 0);
+
+            if (hour < 12) {
+                today.add(Calendar.HOUR, -6);
+            } else {
+                today.add(Calendar.HOUR, 6);
+            }
+
+            int from = (int) (today.getTimeInMillis() / 1000);
+            return new int[]{from, from + (12 * 3600)};
+        }
+
+        private int resolveSleepChartEnd(List<? extends ActivitySample> samples, int baseEnd) {
+            int latestSample = 0;
+            for (ActivitySample sample : samples) {
+                latestSample = Math.max(latestSample, sample.getTimestamp());
+            }
+            if (latestSample <= 0) {
+                return baseEnd;
+            }
+            return Math.min(baseEnd + 3600, Math.max(baseEnd, latestSample + 3600));
+        }
+
         protected SampleProvider<? extends AbstractActivitySample> getProvider(DBHandler db, GBDevice device) {
             DeviceCoordinator coordinator = device.getDeviceCoordinator();
             return coordinator.getSampleProvider(device, db.getDaoSession());
@@ -1514,22 +1550,26 @@ public class MySleep extends Fragment {
                 // Merge samples from all selected devices
                 List<ActivitySample> allSamples = new ArrayList<>();
                 GBDevice primaryDevice = null;
+                int[] chartRange = myData1.getSleepChartRange();
                 for (GBDevice dev : devices) {
                     if (myData1.showAllDevices || myData1.showDeviceList.contains(dev.getAddress())) {
                         if (primaryDevice == null) primaryDevice = dev;
-                        allSamples.addAll(myData1.getAllSamples(dbHandler, dev));
+                        allSamples.addAll(myData1.getSleepChartSamples(dbHandler, dev));
                     }
                 }
                 if (primaryDevice == null) return;
                 allSamples.sort((a, b) -> Integer.compare(a.getTimestamp(), b.getTimestamp()));
                 List<? extends ActivitySample> samples = allSamples;
-                DefaultChartsData<LineData> chartsData = defChartsData(primaryDevice, samples);
+                int chartTo = myData1.resolveSleepChartEnd(samples, chartRange[1]);
+                DefaultChartsData<LineData> chartsData = defChartsData(primaryDevice, samples, chartRange[0], chartTo);
                 Triple<Float, Integer, Integer> hrData = calculateHrData(samples);
                 Triple<Float, Float, Float> intensityData = calculateIntensityData(samples);
                 MyChartsData mcd = new MyChartsData(chartsData, hrData.getLeft(), hrData.getMiddle(), hrData.getRight(), intensityData.getLeft(), intensityData.getMiddle(), intensityData.getRight());
 
                 activityChart.setData(null);
                 activityChart.getXAxis().setValueFormatter(mcd.getChartsData().getXValueFormatter());
+                activityChart.getXAxis().setAxisMinimum(0f);
+                activityChart.getXAxis().setAxisMaximum(Math.max(1, chartTo - chartRange[0]));
                 activityChart.getAxisLeft().setDrawLabels(false);
                 activityChart.setData(mcd.getChartsData().getData());
                 applySleepLegend();
@@ -1539,8 +1579,9 @@ public class MySleep extends Fragment {
         }
     }
 
-    private DefaultChartsData<LineData> defChartsData(GBDevice gbDevice, List<? extends ActivitySample> samples) {
+    private DefaultChartsData<LineData> defChartsData(GBDevice gbDevice, List<? extends ActivitySample> samples, int chartFrom, int chartTo) {
         TimestampTranslation tsTranslation = new TimestampTranslation();
+        tsTranslation.shorten(chartFrom);
         LineData lineData;
 
         if (samples.isEmpty()) {

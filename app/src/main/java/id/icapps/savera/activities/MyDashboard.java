@@ -2451,10 +2451,10 @@ public class MyDashboard extends Fragment {
             return;
         }
 
-        final int snapshotTimeFrom = myData1.timeFrom;
-        final int snapshotTimeTo = myData1.timeTo;
         final int snapshotSleepFrom = myData1.sleepFrom;
         final int snapshotSleepTo = myData1.sleepTo;
+        final int snapshotTimeFrom = snapshotSleepFrom;
+        final int snapshotTimeTo = snapshotSleepTo + 3600;
         final String snapshotSleepType = myData1.sleepType == null ? "night" : myData1.sleepType;
         final long snapshotSleepTotal = myData1.sleepTotalMinutes;
         final long snapshotLightSleep = myData1.lightSleepTotalMinutes;
