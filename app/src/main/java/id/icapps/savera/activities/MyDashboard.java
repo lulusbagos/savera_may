@@ -401,26 +401,7 @@ public class MyDashboard extends Fragment {
         btnSync.setOnClickListener(this::sendSummary);
 
         btnReload = view.findViewById(R.id.btnReload);
-        btnReload.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Context context = getContext();
-                // Check if there are pending uploads to retry
-                if (context != null && !PendingUploadQueue.isEmpty(context)) {
-                    // Show confirmation dialog before retry
-                    new AlertDialog.Builder(requireActivity())
-                        .setTitle("Retry Upload")
-                        .setMessage("Ada " + PendingUploadQueue.snapshot(context).length() + " data tertunda. Retry sekarang?")
-                        .setPositiveButton("Retry", (dialog, which) -> {
-                            flushPendingUploads(true);
-                        })
-                        .setNegativeButton("Batal", null)
-                        .show();
-                } else {
-                    reloadData(view);
-                }
-            }
-        });
+        btnReload.setOnClickListener(v -> take_share_screenshot(requireActivity(), true));
 
         if (savedInstanceState != null && savedInstanceState.containsKey("dashboard_data") && myData1.isEmpty()) {
             myData1 = (MyData) savedInstanceState.getSerializable("dashboard_data");
@@ -3335,19 +3316,32 @@ public class MyDashboard extends Fragment {
     }
 
     private void take_share_screenshot(Context context, boolean share) {
-        final TextView textNama_ = getView().findViewById(R.id.textNama_);
-        final TextView textNik_ = getView().findViewById(R.id.textNik_);
-        final TextView textDepartemen_ = getView().findViewById(R.id.textDepartemen_);
-        final TextView textMess_ = getView().findViewById(R.id.textMess_);
+        View rootView = getView();
+        if (rootView == null || context == null) {
+            return;
+        }
+
+        final TextView textNama_ = rootView.findViewById(R.id.textNama_);
+        final TextView textNik_ = rootView.findViewById(R.id.textNik_);
+        final TextView textDepartemen_ = rootView.findViewById(R.id.textDepartemen_);
+        final TextView textMess_ = rootView.findViewById(R.id.textMess_);
 
         textNama_.setText(textNama.getText());
         textNik_.setText(textNik.getText());
         textDepartemen_.setText(textDepartemen.getText());
         textMess_.setText(textMess.getText());
 
-        final LinearLayout layout = getView().findViewById(R.id.my_dashboard);
+        final LinearLayout layout = rootView.findViewById(R.id.my_dashboard);
         int width = layout.getWidth();
-        int height = layout.getHeight() - 370;
+        int height = Math.max(layout.getHeight(), layout.getMeasuredHeight());
+        if (width <= 0 || height <= 0) {
+            int widthSpec = View.MeasureSpec.makeMeasureSpec(getResources().getDisplayMetrics().widthPixels, View.MeasureSpec.EXACTLY);
+            int heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+            layout.measure(widthSpec, heightSpec);
+            width = layout.getMeasuredWidth();
+            height = layout.getMeasuredHeight();
+            layout.layout(0, 0, width, height);
+        }
         Bitmap screenShot = getScreenShot(layout, width, height, context);
         String fileName = FileUtils.makeValidFileName("Screenshot-" + "Dashboard-" + DateTimeUtils.formatIso8601(new Date(Calendar.getInstance().getTimeInMillis())) + ".png");
 
