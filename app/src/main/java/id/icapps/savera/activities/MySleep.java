@@ -142,6 +142,8 @@ public class MySleep extends Fragment {
     final int color_deep_sleep = Color.rgb(98, 64, 215);
     final int color_rem_sleep = Color.rgb(77, 43, 196);
     final int color_awake_sleep = Color.rgb(244, 117, 117);
+    final int color_spo2 = Color.rgb(0, 220, 40);
+    final int color_stress = Color.rgb(245, 0, 210);
     final int color_text = Color.rgb(0x00, 0x00, 0x00);
     final int color_stripe = Color.argb(50, 0x00, 0x00, 0x00);
 
@@ -1392,12 +1394,12 @@ public class MySleep extends Fragment {
 
         LegendEntry spo2Entry = new LegendEntry();
         spo2Entry.label = "SpO2";
-        spo2Entry.formColor = Color.GREEN;
+        spo2Entry.formColor = color_spo2;
         legendEntries.add(spo2Entry);
 
         LegendEntry stressEntry = new LegendEntry();
         stressEntry.label = "Stress";
-        stressEntry.formColor = Color.MAGENTA;
+        stressEntry.formColor = color_stress;
         legendEntries.add(stressEntry);
 
         activityChart.getLegend().setCustom(legendEntries);
@@ -1480,10 +1482,25 @@ public class MySleep extends Fragment {
         set1.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
         set1.setCubicIntensity(0.1f);
         set1.setDrawCircles(false);
-        set1.setDrawValues(true);
+        set1.setDrawValues(false);
         set1.setValueTextColor(CHART_TEXT_COLOR);
         set1.setAxisDependency(YAxis.AxisDependency.RIGHT);
         return set1;
+    }
+
+    protected LineDataSet createBiometricSet(List<Entry> values, String label, int color, boolean showPoints) {
+        LineDataSet set = createHeartrateSet(values, label);
+        set.setColor(color);
+        set.setLineWidth(showPoints ? 3.0f : 2.2f);
+        set.setMode(LineDataSet.Mode.LINEAR);
+        set.setDrawCircles(showPoints);
+        if (showPoints) {
+            set.setCircleColor(color);
+            set.setCircleRadius(3.2f);
+            set.setDrawCircleHole(false);
+        }
+        set.setLabel(label);
+        return set;
     }
 
     private float calculateIntensitySum(List<Float> samples) {
@@ -1694,7 +1711,7 @@ public class MySleep extends Fragment {
             ));
         }
         if (hr && !heartrateEntries.isEmpty()) {
-            LineDataSet heartrateSet = createHeartrateSet(heartrateEntries, "Heart Rate");
+            LineDataSet heartrateSet = createBiometricSet(heartrateEntries, "Heart Rate", HEARTRATE_COLOR, false);
             lineDataSets.add(heartrateSet);
         }
 
@@ -1723,9 +1740,7 @@ public class MySleep extends Fragment {
                 }
 
                 if (!spo2Entries.isEmpty()) {
-                    LineDataSet spo2Set = createHeartrateSet(spo2Entries, "SpO2");
-                    spo2Set.setColor(Color.GREEN);
-                    spo2Set.setLabel("SpO2");
+                    LineDataSet spo2Set = createBiometricSet(spo2Entries, "SpO2", color_spo2, true);
                     lineDataSets.add(spo2Set);
                 }
             }
@@ -1750,9 +1765,7 @@ public class MySleep extends Fragment {
                 }
 
                 if (!stressEntries.isEmpty()) {
-                    LineDataSet stressSet = createHeartrateSet(stressEntries, "Stress");
-                    stressSet.setColor(Color.MAGENTA);
-                    stressSet.setLabel("Stress");
+                    LineDataSet stressSet = createBiometricSet(stressEntries, "Stress", color_stress, true);
                     lineDataSets.add(stressSet);
                 }
             }
