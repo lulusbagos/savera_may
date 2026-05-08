@@ -72,6 +72,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import id.icapps.savera.GBApplication;
@@ -89,9 +90,11 @@ import id.icapps.savera.database.DBHandler;
 import id.icapps.savera.devices.DeviceCoordinator;
 import id.icapps.savera.devices.SampleProvider;
 import id.icapps.savera.devices.TimeSampleProvider;
+import id.icapps.savera.devices.xiaomi.XiaomiDailySummarySampleProvider;
 import id.icapps.savera.entities.AbstractActivitySample;
 import id.icapps.savera.entities.BaseActivitySummary;
 import id.icapps.savera.entities.BaseActivitySummaryDao;
+import id.icapps.savera.entities.XiaomiDailySummarySample;
 import id.icapps.savera.impl.GBDevice;
 import id.icapps.savera.model.ActivityAmounts;
 import id.icapps.savera.model.ActivityKind;
@@ -1348,9 +1351,9 @@ public class MySleep extends Fragment {
         yAxisRight.setDrawLabels(true);
         yAxisRight.setDrawTopYLabelEntry(true);
         yAxisRight.setTextColor(CHART_TEXT_COLOR);
-        // Accommodate both HR and SpO2 values on the same axis.
+        // Accommodate HR, SpO2, and stress values on the same axis.
         yAxisRight.setAxisMaximum(105f);
-        yAxisRight.setAxisMinimum(40f);
+        yAxisRight.setAxisMinimum(0f);
 
         activityChart.getLegend().setWordWrapEnabled(true);
         activityChart.getLegend().setHorizontalAlignment(Legend.LegendHorizontalAlignment.CENTER);
@@ -1389,6 +1392,11 @@ public class MySleep extends Fragment {
         spo2Entry.label = "SpO2";
         spo2Entry.formColor = Color.GREEN;
         legendEntries.add(spo2Entry);
+
+        LegendEntry stressEntry = new LegendEntry();
+        stressEntry.label = "Stress";
+        stressEntry.formColor = Color.MAGENTA;
+        legendEntries.add(stressEntry);
 
         activityChart.getLegend().setCustom(legendEntries);
     }
@@ -1690,10 +1698,11 @@ public class MySleep extends Fragment {
 
         try (DBHandler dbHandler = GBApplication.acquireDB()) {
             DeviceCoordinator coordinator = gbDevice.getDeviceCoordinator();
+            int tsFrom = samples.get(0).getTimestamp();
+            int tsTo = samples.get(samples.size() - 1).getTimestamp();
+
             if (coordinator.supportsSpo2(gbDevice)) {
                 TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(gbDevice, dbHandler.getDaoSession());
-                int tsFrom = samples.get(0).getTimestamp();
-                int tsTo = samples.get(samples.size() - 1).getTimestamp();
                 List<? extends Spo2Sample> spo2Samples = spo2Provider.getAllSamples(tsFrom * 1000L, tsTo * 1000L);
                 List<Entry> spo2Entries = new ArrayList<>();
                 for (Spo2Sample spo2Sample : spo2Samples) {
@@ -1701,6 +1710,13 @@ public class MySleep extends Fragment {
                     int spo2 = spo2Sample.getSpo2();
                     if (spo2 > 0) {
                         spo2Entries.add(createLineEntry(spo2, ts));
+                    }
+                }
+                if (spo2Entries.isEmpty()) {
+                    Integer spo2 = getDailySummaryValue(dbHandler, gbDevice, tsFrom, tsTo, true);
+                    if (spo2 != null && spo2 > 0) {
+                        spo2Entries.add(createLineEntry(spo2, tsTranslation.shorten(tsFrom)));
+                        spo2Entries.add(createLineEntry(spo2, tsTranslation.shorten(tsTo)));
                     }
                 }
 
@@ -1711,14 +1727,74 @@ public class MySleep extends Fragment {
                     lineDataSets.add(spo2Set);
                 }
             }
+
+            if (coordinator.supportsStressMeasurement()) {
+                TimeSampleProvider<? extends StressSample> stressProvider = coordinator.getStressSampleProvider(gbDevice, dbHandler.getDaoSession());
+                List<? extends StressSample> stressSamples = stressProvider.getAllSamples(tsFrom * 1000L, tsTo * 1000L);
+                List<Entry> stressEntries = new ArrayList<>();
+                for (StressSample stressSample : stressSamples) {
+                    int ts = tsTranslation.shorten((int) (stressSample.getTimestamp() / 1000));
+                    int stress = stressSample.getStress();
+                    if (stress > 0) {
+                        stressEntries.add(createLineEntry(stress, ts));
+                    }
+                }
+                if (stressEntries.isEmpty()) {
+                    Integer stress = getDailySummaryValue(dbHandler, gbDevice, tsFrom, tsTo, false);
+                    if (stress != null && stress > 0) {
+                        stressEntries.add(createLineEntry(stress, tsTranslation.shorten(tsFrom)));
+                        stressEntries.add(createLineEntry(stress, tsTranslation.shorten(tsTo)));
+                    }
+                }
+
+                if (!stressEntries.isEmpty()) {
+                    LineDataSet stressSet = createHeartrateSet(stressEntries, "Stress");
+                    stressSet.setColor(Color.MAGENTA);
+                    stressSet.setLabel("Stress");
+                    lineDataSets.add(stressSet);
+                }
+            }
         } catch (Exception e) {
-            LOG.warn("Could not add SpO2 data to sleep chart", e);
+            LOG.warn("Could not add SpO2/stress data to sleep chart", e);
         }
 
         lineData = new LineData(lineDataSets);
 
         ValueFormatter xValueFormatter = new SampleXLabelFormatter(tsTranslation, "HH:mm");
         return new DefaultChartsData<>(lineData, xValueFormatter);
+    }
+
+    private Integer getDailySummaryValue(DBHandler dbHandler, GBDevice device, int tsFrom, int tsTo, boolean spo2) {
+        try {
+            XiaomiDailySummarySampleProvider provider = new XiaomiDailySummarySampleProvider(device, dbHandler.getDaoSession());
+            long dayStart = getDayStartMillis(tsTo);
+            long dayEnd = dayStart + TimeUnit.DAYS.toMillis(1) - 1;
+            List<XiaomiDailySummarySample> summaries = provider.getAllSamples(dayStart, dayEnd);
+            if (summaries.isEmpty()) {
+                dayStart = getDayStartMillis(tsFrom);
+                dayEnd = dayStart + TimeUnit.DAYS.toMillis(1) - 1;
+                summaries = provider.getAllSamples(dayStart, dayEnd);
+            }
+            for (XiaomiDailySummarySample summary : summaries) {
+                Integer value = spo2 ? summary.getSpo2Avg() : summary.getStressAvg();
+                if (value != null && value > 0) {
+                    return value;
+                }
+            }
+        } catch (Exception ignored) {
+            // Daily summary is only available for some Xiaomi devices.
+        }
+        return null;
+    }
+
+    private long getDayStartMillis(int timestampSeconds) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(timestampSeconds * 1000L);
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar.getTimeInMillis();
     }
 
     private static class MyChartsData extends ChartsData {
