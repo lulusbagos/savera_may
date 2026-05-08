@@ -3690,11 +3690,7 @@ public class MyDashboard extends Fragment {
                 today.add(Calendar.HOUR, -6);
 
                 int sleep1 = (int) (today.getTimeInMillis() / 1000);
-                int sleep2 = sleep1 + (6 * 3600);
-                int sleep3 = sleep1 + (12 * 3600);
 
-                ActivityAmounts amountToday = analysis.calculateActivityAmounts(provider.getAllActivitySamples(sleep2, sleep3));
-                totalT = getTotalsSleepForActivityAmounts(amountToday);
                 ActivityAmounts amountYesterday = analysis.calculateActivityAmounts(provider.getAllActivitySamples(
                         sleep1 - (6 * 3600),
                         sleep1
@@ -3762,11 +3758,9 @@ public class MyDashboard extends Fragment {
             ActivityAmounts amountSleep = analysis.calculateActivityAmounts(provider.getAllActivitySamples(sleepFrom, sleepTo));
             long[] totalS = getTotalsSleepForActivityAmounts(amountSleep);
 
-            if (Objects.equals(sleepType, "day")) {
-                totalT[0] = totalS[0];
-                totalT[1] = totalS[1];
-                totalT[2] = totalS[2];
-            }
+            totalT[0] = totalS[0];
+            totalT[1] = totalS[1];
+            totalT[2] = totalS[2];
 
             return new long[]{totalS[0], totalS[1], totalS[2], totalS[3], (totalT[0] + totalT[1] + totalT[2]), (totalY[0] + totalY[1] + totalY[2]), (totalR[0] + totalR[1] + totalR[2])};
         }
