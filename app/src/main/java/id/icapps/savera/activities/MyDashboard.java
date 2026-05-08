@@ -738,9 +738,7 @@ public class MyDashboard extends Fragment {
         textActive.setText(valueActive);
 
         final long totalSleepMinutes = myData1.getSleepMinutesTotal();
-        final long totalWearableSleepMinutes = myData1.sleepWearableTotalMinutes > 0
-                ? myData1.sleepWearableTotalMinutes
-                : myData1.sleepTotalMinutes;
+        final long totalWearableSleepMinutes = getWearableSleepTotalMinutes(myData1);
         localStorage.setSleepMinutes(totalWearableSleepMinutes);
         final String valueSleep = String.format(
                 Locale.ROOT,
@@ -812,6 +810,13 @@ public class MyDashboard extends Fragment {
         textRest.setText(sleepWearable);
 
         sendSleepSnapshotIfNeeded();
+    }
+
+    private long getWearableSleepTotalMinutes(MyData data) {
+        if (data == null) {
+            return 0;
+        }
+        return data.sleepWearableTotalMinutes > 0 ? data.sleepWearableTotalMinutes : data.sleepTotalMinutes;
     }
 
     @SuppressLint("SetTextI18n")
@@ -2255,7 +2260,7 @@ public class MyDashboard extends Fragment {
                 params.put("calories", myData1.getCalories());
                 params.put("spo2", myData1.bloodOxygen);
                 params.put("stress", myData1.stress);
-                params.put("sleep", myData1.sleepTotalMinutes);
+                params.put("sleep", getWearableSleepTotalMinutes(myData1));
                 params.put("sleep_start", myData1.sleepFrom);
                 params.put("sleep_end", myData1.sleepTo);
                 params.put("sleep_type", myData1.sleepType);
@@ -2460,7 +2465,7 @@ public class MyDashboard extends Fragment {
         final int snapshotTimeFrom = snapshotSleepFrom;
         final int snapshotTimeTo = snapshotSleepTo + 3600;
         final String snapshotSleepType = myData1.sleepType == null ? "night" : myData1.sleepType;
-        final long snapshotSleepTotal = myData1.sleepTotalMinutes;
+        final long snapshotSleepTotal = getWearableSleepTotalMinutes(myData1);
         final long snapshotLightSleep = myData1.lightSleepTotalMinutes;
         final long snapshotDeepSleep = myData1.deepSleepTotalMinutes;
         final long snapshotRemSleep = myData1.remSleepTotalMinutes;
@@ -3793,11 +3798,11 @@ public class MyDashboard extends Fragment {
                     remSleepTotalMinutes += sleep[2];
                     awakeSleepTotalMinutes += sleep[3];
                     sleepToday += sleep[4];
-                    sleepYesterday += capYesterdaySleepMinutes(sleep[5]);
+                    sleepYesterday += sleep[5];
                     sleepRest += sleep[6];
                     long sleepWithoutAwake = sleep[4] + capYesterdaySleepMinutes(sleep[5]);
                     sleepTotalMinutes += sleepWithoutAwake;
-                    sleepWearableTotalMinutes += sleepWithoutAwake + sleep[3];
+                    sleepWearableTotalMinutes += sleep[0] + sleep[1] + sleep[2] + sleep[3];
                 }
             } catch (Exception e) {
                 LOG.warn("Could not calculate total amount of sleep: ", e);
