@@ -119,8 +119,8 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void checkLogin() {
-        user = textUser.getText().toString();
-        password = textPassword.getText().toString();
+        user = textUser.getText().toString().trim();
+        password = textPassword.getText().toString().trim();
         if (user.isEmpty() || password.isEmpty()) {
             toast(LoginActivity.this, "User and Password are required", Toast.LENGTH_SHORT, GB.ERROR);
         } else {
