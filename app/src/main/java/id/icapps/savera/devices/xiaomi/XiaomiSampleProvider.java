@@ -23,12 +23,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
+import de.greenrobot.dao.query.QueryBuilder;
 import id.icapps.savera.devices.AbstractSampleProvider;
 import id.icapps.savera.entities.DaoSession;
 import id.icapps.savera.entities.XiaomiActivitySample;
@@ -90,6 +93,64 @@ public class XiaomiSampleProvider extends AbstractSampleProvider<XiaomiActivityS
     @Override
     public XiaomiActivitySample createActivitySample() {
         return new XiaomiActivitySample();
+    }
+
+    @Override
+    public void addGBActivitySamples(final XiaomiActivitySample[] activitySamples) {
+        preserveExistingBiometrics(activitySamples);
+        super.addGBActivitySamples(activitySamples);
+    }
+
+    @Override
+    public void addGBActivitySample(final XiaomiActivitySample activitySample) {
+        preserveExistingBiometrics(new XiaomiActivitySample[]{activitySample});
+        super.addGBActivitySample(activitySample);
+    }
+
+    private void preserveExistingBiometrics(final XiaomiActivitySample[] activitySamples) {
+        if (activitySamples == null || activitySamples.length == 0) {
+            return;
+        }
+
+        int minTimestamp = Integer.MAX_VALUE;
+        int maxTimestamp = Integer.MIN_VALUE;
+        long deviceId = activitySamples[0].getDeviceId();
+        for (final XiaomiActivitySample sample : activitySamples) {
+            minTimestamp = Math.min(minTimestamp, sample.getTimestamp());
+            maxTimestamp = Math.max(maxTimestamp, sample.getTimestamp());
+        }
+
+        final QueryBuilder<XiaomiActivitySample> qb = getSampleDao().queryBuilder();
+        qb.where(
+                XiaomiActivitySampleDao.Properties.DeviceId.eq(deviceId),
+                XiaomiActivitySampleDao.Properties.Timestamp.ge(minTimestamp),
+                XiaomiActivitySampleDao.Properties.Timestamp.le(maxTimestamp)
+        );
+
+        final Map<Integer, XiaomiActivitySample> existingByTimestamp = new HashMap<>();
+        for (final XiaomiActivitySample existing : qb.build().list()) {
+            existingByTimestamp.put(existing.getTimestamp(), existing);
+        }
+
+        for (final XiaomiActivitySample sample : activitySamples) {
+            final XiaomiActivitySample existing = existingByTimestamp.get(sample.getTimestamp());
+            if (existing == null) {
+                continue;
+            }
+
+            if (sample.getSpo2() == null && existing.getSpo2() != null) {
+                sample.setSpo2(existing.getSpo2());
+            }
+            if (sample.getStress() == null && existing.getStress() != null) {
+                sample.setStress(existing.getStress());
+            }
+            if ((sample.getHeartRate() <= 0 || sample.getHeartRate() >= 255) && existing.getHeartRate() > 0 && existing.getHeartRate() < 255) {
+                sample.setHeartRate(existing.getHeartRate());
+            }
+            if (sample.getSteps() == 0 && existing.getSteps() > 0) {
+                sample.setSteps(existing.getSteps());
+            }
+        }
     }
 
     @Override
