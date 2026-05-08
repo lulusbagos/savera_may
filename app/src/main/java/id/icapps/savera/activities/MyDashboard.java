@@ -3766,7 +3766,15 @@ public class MyDashboard extends Fragment {
             totalT[1] = totalS[1];
             totalT[2] = totalS[2];
 
-            return new long[]{totalS[0], totalS[1], totalS[2], totalS[3], (totalT[0] + totalT[1] + totalT[2]), (totalY[0] + totalY[1] + totalY[2]), (totalR[0] + totalR[1] + totalR[2])};
+            long sleepTodayMinutes = totalT[0] + totalT[1] + totalT[2];
+            long sleepYesterdayMinutes = totalY[0] + totalY[1] + totalY[2];
+            long sleepRestMinutes = totalR[0] + totalR[1] + totalR[2];
+            long wearableTotalMinutes = sleepTodayMinutes
+                    + sleepYesterdayMinutes
+                    + totalS[3]
+                    + totalY[3];
+
+            return new long[]{totalS[0], totalS[1], totalS[2], totalS[3], sleepTodayMinutes, sleepYesterdayMinutes, sleepRestMinutes, wearableTotalMinutes};
         }
 
         private long capYesterdaySleepMinutes(long minutes) {
@@ -3800,7 +3808,11 @@ public class MyDashboard extends Fragment {
                     sleepRest += sleep[6];
                     long sleepWithoutAwake = sleep[4] + capYesterdaySleepMinutes(sleep[5]);
                     sleepTotalMinutes += sleepWithoutAwake;
-                    sleepWearableTotalMinutes += sleep[0] + sleep[1] + sleep[2] + sleep[3];
+                    if (sleep.length > 7 && sleep[7] > 0) {
+                        sleepWearableTotalMinutes += sleep[7];
+                    } else {
+                        sleepWearableTotalMinutes += sleep[0] + sleep[1] + sleep[2] + sleep[3];
+                    }
                 }
             } catch (Exception e) {
                 LOG.warn("Could not calculate total amount of sleep: ", e);
