@@ -1503,6 +1503,26 @@ public class MySleep extends Fragment {
         return set;
     }
 
+    private void addBiometricSets(List<ILineDataSet> dataSets, List<Entry> entries, String label, int color, boolean showPoints, int maxGapSeconds) {
+        if (entries.isEmpty()) {
+            return;
+        }
+        entries.sort((a, b) -> Float.compare(a.getX(), b.getX()));
+        List<Entry> segment = new ArrayList<>();
+        Entry previous = null;
+        for (Entry entry : entries) {
+            if (previous != null && entry.getX() - previous.getX() > maxGapSeconds) {
+                dataSets.add(createBiometricSet(segment, label, color, showPoints));
+                segment = new ArrayList<>();
+            }
+            segment.add(entry);
+            previous = entry;
+        }
+        if (!segment.isEmpty()) {
+            dataSets.add(createBiometricSet(segment, label, color, showPoints));
+        }
+    }
+
     private float calculateIntensitySum(List<Float> samples) {
         float result = 0;
         for (Float sample : samples) {
@@ -1740,8 +1760,7 @@ public class MySleep extends Fragment {
                 }
 
                 if (!spo2Entries.isEmpty()) {
-                    LineDataSet spo2Set = createBiometricSet(spo2Entries, "SpO2", color_spo2, true);
-                    lineDataSets.add(spo2Set);
+                    addBiometricSets(lineDataSets, spo2Entries, "SpO2", color_spo2, true, 20 * 60);
                 }
             }
 
@@ -1765,8 +1784,7 @@ public class MySleep extends Fragment {
                 }
 
                 if (!stressEntries.isEmpty()) {
-                    LineDataSet stressSet = createBiometricSet(stressEntries, "Stress", color_stress, true);
-                    lineDataSets.add(stressSet);
+                    addBiometricSets(lineDataSets, stressEntries, "Stress", color_stress, true, 15 * 60);
                 }
             }
         } catch (Exception e) {
