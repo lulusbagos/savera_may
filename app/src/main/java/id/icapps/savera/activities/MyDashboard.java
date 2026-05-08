@@ -1286,6 +1286,10 @@ public class MyDashboard extends Fragment {
                 continue;
             }
 
+            if (("stress".equals(valueKey) || "spo2".equals(valueKey)) && item.optInt(valueKey, 0) <= 0) {
+                continue;
+            }
+
             JSONObject existing = byTimestamp.get(ts);
             if (existing == null) {
                 byTimestamp.put(ts, item);
