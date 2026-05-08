@@ -63,7 +63,7 @@ public class MyLeaderboard extends Fragment {
     private static final int TARGET_SLEEP_MINUTES = 7 * 60;
     private static final int SLEEP_WINDOW_OFFSET_HOURS = 6; // Match dashboard sleep boundary.
     private static final int SLEEP_WINDOW_TOTAL_HOURS = 12;
-    private static final int REST_SLEEP_CAP_MINUTES = 60;
+    private static final int SUPPORT_SLEEP_CAP_MINUTES = 60;
 
     private TextView textPeriod, textTotal, textAverage, textRank, textEmployeeName2, textEmployeeNik2;
     private LinearLayout listView;
@@ -217,35 +217,20 @@ public class MyLeaderboard extends Fragment {
 
         int sleepFrom = (int) (sleepBase.getTimeInMillis() / 1000L);
         int sleepTo = sleepFrom + (SLEEP_WINDOW_TOTAL_HOURS * 3600);
-        Calendar restStart = (Calendar) sleepBase.clone();
-        Calendar restEnd = (Calendar) sleepBase.clone();
-        if (currentHour < 12) {
-            restStart.set(Calendar.HOUR_OF_DAY, 11);
-            restStart.set(Calendar.MINUTE, 0);
-            restStart.set(Calendar.SECOND, 0);
-            restEnd.set(Calendar.HOUR_OF_DAY, 14);
-            restEnd.set(Calendar.MINUTE, 0);
-            restEnd.set(Calendar.SECOND, 0);
-        } else {
-            restStart.add(Calendar.DAY_OF_MONTH, -1);
-            restStart.set(Calendar.HOUR_OF_DAY, 23);
-            restStart.set(Calendar.MINUTE, 0);
-            restStart.set(Calendar.SECOND, 0);
-            restEnd.set(Calendar.HOUR_OF_DAY, 2);
-            restEnd.set(Calendar.MINUTE, 0);
-            restEnd.set(Calendar.SECOND, 0);
-        }
-        int restFrom = (int) (restStart.getTimeInMillis() / 1000L);
-        int restTo = (int) (restEnd.getTimeInMillis() / 1000L);
+        Calendar supportStart = (Calendar) sleepBase.clone();
+        supportStart.add(Calendar.HOUR_OF_DAY, -SLEEP_WINDOW_OFFSET_HOURS);
+        Calendar supportEnd = (Calendar) sleepBase.clone();
+        int supportFrom = (int) (supportStart.getTimeInMillis() / 1000L);
+        int supportTo = (int) (supportEnd.getTimeInMillis() / 1000L);
 
         // For current day, avoid projecting future values.
         Calendar now = Calendar.getInstance();
         if (isSameDay(windowBase, now)) {
             sleepTo = Math.min(sleepTo, nowTs);
-            restTo = Math.min(restTo, nowTs);
+            supportTo = Math.min(supportTo, nowTs);
         }
 
-        if (sleepTo <= sleepFrom && restTo <= restFrom) {
+        if (sleepTo <= sleepFrom && supportTo <= supportFrom) {
             return new SleepWindowData(0L, 0);
         }
 
@@ -256,28 +241,25 @@ public class MyLeaderboard extends Fragment {
         List<? extends ActivitySample> sleepSamples = sleepTo > sleepFrom
                 ? provider.getAllActivitySamples(sleepFrom, sleepTo)
                 : Collections.emptyList();
-        List<? extends ActivitySample> restSamples = restTo > restFrom
-                ? provider.getAllActivitySamples(restFrom, restTo)
+        List<? extends ActivitySample> supportSamples = supportTo > supportFrom
+                ? provider.getAllActivitySamples(supportFrom, supportTo)
                 : Collections.emptyList();
         if (sleepSamples == null) {
             sleepSamples = Collections.emptyList();
         }
-        if (restSamples == null) {
-            restSamples = Collections.emptyList();
+        if (supportSamples == null) {
+            supportSamples = Collections.emptyList();
         }
 
-        int sampleCount = sleepSamples.size() + restSamples.size();
+        int sampleCount = sleepSamples.size() + supportSamples.size();
         if (sampleCount <= 0) {
             return new SleepWindowData(0L, 0);
         }
 
         long mainSleepMinutes = calculateSleepMinutes(analysis, sleepSamples);
-        long restSleepMinutes = calculateSleepMinutes(analysis, restSamples);
-        if (restSleepMinutes > REST_SLEEP_CAP_MINUTES) {
-            restSleepMinutes = REST_SLEEP_CAP_MINUTES;
-        }
+        long supportSleepMinutes = Math.min(SUPPORT_SLEEP_CAP_MINUTES, calculateSleepMinutes(analysis, supportSamples));
 
-        return new SleepWindowData(mainSleepMinutes + restSleepMinutes, sampleCount);
+        return new SleepWindowData(mainSleepMinutes + supportSleepMinutes, sampleCount);
     }
 
     private long calculateSleepMinutes(ActivityAnalysis analysis, List<? extends ActivitySample> samples) {
