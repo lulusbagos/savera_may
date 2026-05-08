@@ -173,6 +173,8 @@ public class XiaomiSampleProvider extends AbstractSampleProvider<XiaomiActivityS
                 return ActivityKind.LIGHT_SLEEP;
             case 4:
                 return ActivityKind.REM_SLEEP;
+            case 5:
+                return ActivityKind.AWAKE_SLEEP;
             default: // default to awake
                 return ActivityKind.UNKNOWN;
         }
