@@ -139,19 +139,28 @@ public class ActivitySleepChartFragment extends AbstractActivityChartFragment<De
         if (!samples.isEmpty()) {
             try {
                 DeviceCoordinator coordinator = device.getDeviceCoordinator();
-                TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(device, db.getDaoSession());
                 int tsOffset = samples.get(0).getTimestamp();
                 int tsFrom = tsOffset;
                 int tsTo = samples.get(samples.size() - 1).getTimestamp();
 
-                List<? extends Spo2Sample> spo2Samples = spo2Provider.getAllSamples(tsFrom * 1000L, tsTo * 1000L);
                 List<Entry> spo2Entries = new ArrayList<>();
-                for (Spo2Sample spo2Sample : spo2Samples) {
-                    int x = (int) (spo2Sample.getTimestamp() / 1000) - tsOffset;
-                    int spo2 = spo2Sample.getSpo2();
-                    if (spo2 > 0) {
-                        spo2Entries.add(new Entry(x, spo2));
+
+                if (coordinator.supportsSpo2(device)) {
+                    TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(device, db.getDaoSession());
+                    if (spo2Provider != null) {
+                        List<? extends Spo2Sample> spo2Samples = spo2Provider.getAllSamples(tsFrom * 1000L, tsTo * 1000L);
+                        for (Spo2Sample spo2Sample : spo2Samples) {
+                            int x = (int) (spo2Sample.getTimestamp() / 1000) - tsOffset;
+                            int spo2 = spo2Sample.getSpo2();
+                            if (spo2 > 0) {
+                                spo2Entries.add(new Entry(x, spo2));
+                            }
+                        }
                     }
+                }
+
+                if (spo2Entries.isEmpty()) {
+                    addSpo2EntriesFromActivitySamples(samples, tsOffset, spo2Entries);
                 }
 
                 if (!spo2Entries.isEmpty()) {
@@ -172,6 +181,23 @@ public class ActivitySleepChartFragment extends AbstractActivityChartFragment<De
         }
 
         return chartData;
+    }
+
+    private void addSpo2EntriesFromActivitySamples(List<? extends ActivitySample> samples, int tsOffset, List<Entry> spo2Entries) {
+        for (ActivitySample sample : samples) {
+            try {
+                java.lang.reflect.Method method = sample.getClass().getMethod("getSpo2");
+                Object value = method.invoke(sample);
+                if (value instanceof Number) {
+                    int spo2 = ((Number) value).intValue();
+                    if (spo2 > 0) {
+                        spo2Entries.add(new Entry(sample.getTimestamp() - tsOffset, spo2));
+                    }
+                }
+            } catch (Exception ignored) {
+                // Some activity sample classes do not expose SpO2 fields.
+            }
+        }
     }
 
     @Override
