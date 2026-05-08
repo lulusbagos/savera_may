@@ -739,7 +739,7 @@ public class MyDashboard extends Fragment {
 
         final long totalSleepMinutes = myData1.getSleepMinutesTotal();
         final long totalWearableSleepMinutes = getWearableSleepTotalMinutes(myData1);
-        localStorage.setSleepMinutes(totalWearableSleepMinutes);
+        localStorage.setSleepMinutes(totalSleepMinutes);
         final String valueSleep = String.format(
                 Locale.ROOT,
                 "%d:%02d",
@@ -2260,7 +2260,7 @@ public class MyDashboard extends Fragment {
                 params.put("calories", myData1.getCalories());
                 params.put("spo2", myData1.bloodOxygen);
                 params.put("stress", myData1.stress);
-                params.put("sleep", getWearableSleepTotalMinutes(myData1));
+                params.put("sleep", myData1.sleepTotalMinutes);
                 params.put("sleep_start", myData1.sleepFrom);
                 params.put("sleep_end", myData1.sleepTo);
                 params.put("sleep_type", myData1.sleepType);
@@ -2465,7 +2465,7 @@ public class MyDashboard extends Fragment {
         final int snapshotTimeFrom = snapshotSleepFrom;
         final int snapshotTimeTo = snapshotSleepTo + 3600;
         final String snapshotSleepType = myData1.sleepType == null ? "night" : myData1.sleepType;
-        final long snapshotSleepTotal = getWearableSleepTotalMinutes(myData1);
+        final long snapshotSleepTotal = myData1.sleepTotalMinutes;
         final long snapshotLightSleep = myData1.lightSleepTotalMinutes;
         final long snapshotDeepSleep = myData1.deepSleepTotalMinutes;
         final long snapshotRemSleep = myData1.remSleepTotalMinutes;
@@ -3936,17 +3936,21 @@ public class MyDashboard extends Fragment {
             }
 
             DeviceCoordinator coordinator = dev.getDeviceCoordinator();
-            if (coordinator == null || !coordinator.supportsStressMeasurement()) {
-                return 0;
+            int stressValue = 0;
+            if (coordinator != null && coordinator.supportsStressMeasurement()) {
+                TimeSampleProvider<? extends StressSample> stressProvider = coordinator.getStressSampleProvider(dev, dbHandler.getDaoSession());
+                if (stressProvider != null) {
+                    List<? extends StressSample> stressSamples = stressProvider.getAllSamples(fromMillis, toMillis);
+                    for (StressSample row : stressSamples) {
+                        if (row.getStress() > 0) {
+                            stressValue = row.getStress();
+                        }
+                    }
+                }
             }
 
-            TimeSampleProvider<? extends StressSample> stressProvider = coordinator.getStressSampleProvider(dev, dbHandler.getDaoSession());
-            List<? extends StressSample> stressSamples = stressProvider.getAllSamples(fromMillis, toMillis);
-            int stressValue = 0;
-            for (StressSample row : stressSamples) {
-                if (row.getStress() > 0) {
-                    stressValue = row.getStress();
-                }
+            if (stressValue == 0) {
+                stressValue = getLatestIntFromActivitySamples(dev, dbHandler, fromMillis / 1000L, toMillis / 1000L, "getStress");
             }
             return stressValue;
         }
@@ -3989,19 +3993,57 @@ public class MyDashboard extends Fragment {
             }
 
             DeviceCoordinator coordinator = dev.getDeviceCoordinator();
-            if (coordinator == null || !coordinator.supportsSpo2(dev)) {
+            int spo2Value = 0;
+            if (coordinator != null && coordinator.supportsSpo2(dev)) {
+                TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(dev, dbHandler.getDaoSession());
+                if (spo2Provider != null) {
+                    List<? extends Spo2Sample> spo2Samples = spo2Provider.getAllSamples(fromMillis, toMillis);
+                    for (Spo2Sample row : spo2Samples) {
+                        if (row.getSpo2() > 0) {
+                            spo2Value = row.getSpo2();
+                        }
+                    }
+                }
+            }
+
+            if (spo2Value == 0) {
+                spo2Value = getLatestIntFromActivitySamples(dev, dbHandler, fromMillis / 1000L, toMillis / 1000L, "getSpo2");
+            }
+            return spo2Value;
+        }
+
+        private int getLatestIntFromActivitySamples(GBDevice dev, DBHandler dbHandler, long fromSeconds, long toSeconds, String methodName) {
+            if (dev == null || methodName == null || fromSeconds <= 0 || toSeconds <= fromSeconds) {
                 return 0;
             }
 
-            TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(dev, dbHandler.getDaoSession());
-            List<? extends Spo2Sample> spo2Samples = spo2Provider.getAllSamples(fromMillis, toMillis);
-            int spo2Value = 0;
-            for (Spo2Sample row : spo2Samples) {
-                if (row.getSpo2() > 0) {
-                    spo2Value = row.getSpo2();
+            try {
+                SampleProvider<? extends ActivitySample> provider = getProvider(dbHandler, dev);
+                if (provider == null) {
+                    return 0;
                 }
+
+                List<? extends ActivitySample> samples = provider.getAllActivitySamples((int) fromSeconds, (int) toSeconds);
+                int latestValue = 0;
+                for (ActivitySample row : samples) {
+                    try {
+                        java.lang.reflect.Method method = row.getClass().getMethod(methodName);
+                        Object value = method.invoke(row);
+                        if (value instanceof Number) {
+                            int intValue = ((Number) value).intValue();
+                            if (intValue > 0) {
+                                latestValue = intValue;
+                            }
+                        }
+                    } catch (Exception ignored) {
+                        // Some activity sample classes do not expose SpO2/stress fields.
+                    }
+                }
+                return latestValue;
+            } catch (Exception e) {
+                LOG.warn("Could not read {} from activity samples", methodName, e);
+                return 0;
             }
-            return spo2Value;
         }
 
         private long getSleepMetricRangeFromMillis() {
