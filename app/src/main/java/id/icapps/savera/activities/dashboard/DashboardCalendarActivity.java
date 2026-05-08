@@ -33,6 +33,8 @@ import android.text.SpannableStringBuilder;
 import android.text.style.ForegroundColorSpan;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
+import android.view.View;
+import android.graphics.Typeface;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -66,24 +68,24 @@ public class DashboardCalendarActivity extends AbstractGBActivity {
     private final ConcurrentHashMap<Integer, Integer> dayColors = new ConcurrentHashMap<>();
 
     @ColorInt
-    private int color_unknown = Color.argb(50, 128, 128, 128);
+    private int color_unknown = Color.rgb(229, 231, 235);
     @ColorInt
-    private int color_0_25 = Color.argb(128, 255, 0, 0); // Red
+    private int color_0_25 = Color.rgb(254, 226, 226); // Red
     @ColorInt
-    private int color_25_50 = Color.argb(128, 255, 128, 0); // Orange
+    private int color_25_50 = Color.rgb(255, 237, 213); // Orange
     @ColorInt
-    private int color_50_75 = Color.argb(128, 255, 255, 0); // Yellow
+    private int color_50_75 = Color.rgb(254, 249, 195); // Yellow
     @ColorInt
-    private int color_75_100 = Color.argb(128, 0, 128, 0); // Dark green
+    private int color_75_100 = Color.rgb(220, 252, 231); // Dark green
     @ColorInt
-    private int color_100 = Color.argb(128, 0, 255, 0); // Green
+    private int color_100 = Color.rgb(187, 247, 208); // Green
 
     private boolean showAllDevices;
     private Set<String> showDeviceList;
 
     TextView monthTextView;
-    TextView arrowLeft;
-    TextView arrowRight;
+    View arrowLeft;
+    View arrowRight;
     GridLayout calendarGrid;
     Calendar currentDay;
     Calendar cal;
@@ -146,18 +148,21 @@ public class DashboardCalendarActivity extends AbstractGBActivity {
         SimpleDateFormat monthFormat = new SimpleDateFormat("LLLL yyyy", Locale.getDefault());
         monthTextView.setText(monthFormat.format(cal.getTime()));
         Calendar today = GregorianCalendar.getInstance();
-        today.set(Calendar.HOUR, 23);
+        today.set(Calendar.HOUR_OF_DAY, 23);
         today.set(Calendar.MINUTE, 59);
         today.set(Calendar.SECOND, 59);
         if (DateTimeUtils.isSameMonth(today, cal)) {
+            arrowRight.setEnabled(false);
             arrowRight.setAlpha(0.5f);
         } else {
+            arrowRight.setEnabled(true);
             arrowRight.setAlpha(1);
         }
         // Calculate grid cell size for dates
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
         int screenWidth = displayMetrics.widthPixels;
-        int cellSize = screenWidth / 7;
+        int horizontalPadding = Math.round(56 * displayMetrics.density);
+        int cellSize = Math.max(40, (screenWidth - horizontalPadding) / 7);
         // Determine first day that should be displayed
         Calendar drawCal = (Calendar) cal.clone();
         drawCal.set(Calendar.DAY_OF_MONTH, 1);
@@ -204,18 +209,26 @@ public class DashboardCalendarActivity extends AbstractGBActivity {
         TextView text = new TextView(this);
         text.setLayoutParams(layoutParams);
         text.setGravity(Gravity.CENTER);
+        text.setIncludeFontPadding(false);
         return text;
     }
 
     private void createWeekdayCell(String day, int cellSize) {
         TextView text = prepareGridElement(cellSize);
-        text.setText(day);
+        text.setText(day.toUpperCase(Locale.getDefault()));
+        text.setTextColor(Color.rgb(107, 114, 128));
+        text.setTextSize(11);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
         calendarGrid.addView(text);
     }
 
     private void createDateCell(Calendar day, int cellSize, boolean clickable) {
         TextView text = prepareGridElement(cellSize);
         text.setText(String.valueOf(day.get(Calendar.DAY_OF_MONTH)));
+        text.setTextSize(14);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        text.setTextColor(clickable ? Color.rgb(17, 24, 39) : Color.rgb(156, 163, 175));
+        text.setAlpha(clickable ? 1f : 0.55f);
         if (clickable) {
             // Save textview for later coloring
             dayCells.put((Calendar) day.clone(), text);
@@ -285,9 +298,10 @@ public class DashboardCalendarActivity extends AbstractGBActivity {
                     GradientDrawable borderDrawable = new GradientDrawable();
                     borderDrawable.setShape(GradientDrawable.OVAL);
                     borderDrawable.setColor(Color.TRANSPARENT);
-                    borderDrawable.setStroke(5, GBApplication.getTextColor(getApplicationContext()));
+                    borderDrawable.setStroke(5, Color.rgb(37, 99, 235));
                     LayerDrawable layerDrawable = new LayerDrawable(new Drawable[]{backgroundDrawable, borderDrawable});
                     text.setBackground(layerDrawable);
+                    text.setTextColor(Color.rgb(17, 24, 39));
                 } else {
                     text.setBackground(backgroundDrawable);
                 }

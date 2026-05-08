@@ -3,56 +3,126 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#F4F6FA"
+    android:fillViewport="true"
     tools:context=".activities.dashboard.DashboardCalendarActivity">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingLeft="16dp"
+        android:paddingTop="18dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="24dp">
 
-        <RelativeLayout
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_margin="8dp"
+            android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <Button
+            <ImageButton
                 android:id="@+id/arrow_left"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:text="\u003C"
-                android:textStyle="bold"
-                android:textSize="20sp"
-                android:layout_alignParentLeft="true" />
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_dashboard_calendar_nav"
+                android:contentDescription="Bulan sebelumnya"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_arrow_circle_left"
+                android:tint="#243B6B"
+                tools:ignore="HardcodedText" />
 
-            <TextView
-                android:id="@+id/calendar_month"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="@string/calendar_month"
-                android:textStyle="bold"
-                android:textSize="25sp"
-                android:layout_centerInParent="true" />
+                android:layout_marginLeft="12dp"
+                android:layout_marginRight="12dp"
+                android:gravity="center"
+                android:orientation="vertical">
 
-            <Button
+                <TextView
+                    android:id="@+id/calendar_month"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="@string/calendar_month"
+                    android:textColor="#111827"
+                    android:textSize="21sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center"
+                    android:text="Kalender data harian"
+                    android:textColor="#6B7280"
+                    android:textSize="12sp"
+                    tools:ignore="HardcodedText" />
+            </LinearLayout>
+
+            <ImageButton
                 android:id="@+id/arrow_right"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:text="\u003E"
-                android:textStyle="bold"
-                android:textSize="20sp"
-                android:layout_alignParentRight="true" />
-        </RelativeLayout>
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_dashboard_calendar_nav"
+                android:contentDescription="Bulan berikutnya"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_arrow_circle_right"
+                android:tint="#243B6B"
+                tools:ignore="HardcodedText" />
+        </LinearLayout>
 
-        <androidx.gridlayout.widget.GridLayout
-            android:id="@+id/dashboard_calendar_grid"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="15dp"
-            android:layout_marginBottom="15dp"
-            app:columnCount="7" />
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_dashboard_calendar_panel"
+            android:elevation="2dp"
+            android:orientation="vertical"
+            android:paddingLeft="12dp"
+            android:paddingTop="14dp"
+            android:paddingRight="12dp"
+            android:paddingBottom="14dp">
+
+            <androidx.gridlayout.widget.GridLayout
+                android:id="@+id/dashboard_calendar_grid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:columnCount="7" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_dashboard_calendar_hint"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="14dp"
+            android:paddingTop="10dp"
+            android:paddingRight="14dp"
+            android:paddingBottom="10dp">
+
+            <View
+                android:layout_width="9dp"
+                android:layout_height="9dp"
+                android:background="@drawable/bg_dashboard_calendar_dot" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="10dp"
+                android:layout_weight="1"
+                android:text="Pilih tanggal untuk melihat data tidur dan upload."
+                android:textColor="#374151"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                tools:ignore="HardcodedText" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
