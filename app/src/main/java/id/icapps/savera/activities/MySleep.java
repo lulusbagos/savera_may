@@ -141,7 +141,7 @@ public class MySleep extends Fragment {
     final int color_light_sleep = Color.rgb(139, 65, 218);
     final int color_deep_sleep = Color.rgb(98, 64, 215);
     final int color_rem_sleep = Color.rgb(77, 43, 196);
-    final int color_awake_sleep = Color.rgb(111, 164, 62);
+    final int color_awake_sleep = Color.rgb(244, 117, 117);
     final int color_text = Color.rgb(0x00, 0x00, 0x00);
     final int color_stripe = Color.argb(50, 0x00, 0x00, 0x00);
 
@@ -230,8 +230,10 @@ public class MySleep extends Fragment {
         l_light_sleep.setSpan(new ForegroundColorSpan(color_light_sleep), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         SpannableString l_rem_sleep = new SpannableString("■ " + getString(R.string.activity_type_rem_sleep));
         l_rem_sleep.setSpan(new ForegroundColorSpan(color_rem_sleep), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        SpannableString l_awake_sleep = new SpannableString("\u25A0 " + getString(R.string.abstract_chart_fragment_kind_awake_sleep));
+        l_awake_sleep.setSpan(new ForegroundColorSpan(color_awake_sleep), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         SpannableStringBuilder legendBuilder = new SpannableStringBuilder();
-        legend.setText(legendBuilder.append(l_worn).append(" ").append(l_not_worn).append(" ").append(l_activity).append("\n").append(l_light_sleep).append(" ").append(l_deep_sleep).append(" ").append(l_rem_sleep));
+        legend.setText(legendBuilder.append(l_worn).append(" ").append(l_not_worn).append(" ").append(l_activity).append("\n").append(l_light_sleep).append(" ").append(l_deep_sleep).append(" ").append(l_rem_sleep).append(" ").append(l_awake_sleep));
 
         imgClock1 = view.findViewById(R.id.sleepChart1);
         imgClock2 = view.findViewById(R.id.sleepChart2);
