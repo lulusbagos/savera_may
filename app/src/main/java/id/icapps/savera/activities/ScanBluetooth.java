@@ -4,6 +4,7 @@ import static id.icapps.savera.util.GB.toast;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -702,7 +703,7 @@ public class ScanBluetooth extends AbstractGBActivity implements AdapterView.OnI
                 && hasValidCachedAuthKey(sharedPrefs, coordinator)) {
             Long syncedAt = sharedPrefs.getLong(PREF_AUTH_KEY_SYNCED_AT, 0L);
             LOG.info("Using cached auth key for mac={}, syncedAt={}", deviceCandidate.getMacAddress(), syncedAt);
-            toast(ScanBluetooth.this, "Auth key pakai cache lokal", Toast.LENGTH_SHORT, GB.INFO);
+            showAuthKeyReadyToast(true);
             onItemClick(adapterView, view, position, id);
             return true;
         }
@@ -735,6 +736,10 @@ public class ScanBluetooth extends AbstractGBActivity implements AdapterView.OnI
         final String url = getString(R.string.base_url) + "/device/" + normalizedMacAddress;
         final LocalStorage localStorage = new LocalStorage(ScanBluetooth.this);
         final String companyHeader = localStorage.getCompanyCode();
+        final ProgressDialog progressDialog = new ProgressDialog(ScanBluetooth.this);
+        progressDialog.setMessage("Mengambil auth key perangkat...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
 
         LOG.info("Pairing lookup request mac={} company={} url={}", normalizedMacAddress, companyHeader, url);
 
@@ -745,11 +750,15 @@ public class ScanBluetooth extends AbstractGBActivity implements AdapterView.OnI
                 http.setMethod("get");
                 http.setToken(true);
                 http.setBypassCache(true);
+                http.setConnectTimeoutMs(8000);
+                http.setReadTimeoutMs(12000);
+                http.setMaxAttempts(1);
                 http.send();
 
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        dismissProgress(progressDialog);
                         Integer code = http.getStatusCode();
                         LOG.info("Pairing lookup response mac={} company={} status={} body={}", normalizedMacAddress, companyHeader, code, http.getResponse());
 
@@ -758,7 +767,10 @@ public class ScanBluetooth extends AbstractGBActivity implements AdapterView.OnI
                                 JSONObject response = new JSONObject(http.getResponse());
                                 String fetchedAuthKey = response.optString("auth_key", "");
                                 if (fetchedAuthKey == null || fetchedAuthKey.trim().isEmpty() || "null".equalsIgnoreCase(fetchedAuthKey.trim())) {
-                                    toast(ScanBluetooth.this, "Auth key dari server tidak valid", Toast.LENGTH_SHORT, GB.ERROR);
+                                    showAuthKeyErrorDialog(
+                                            "Auth key tidak valid",
+                                            "Server berhasil dihubungi, tetapi field auth_key kosong. Pastikan endpoint /device/" + normalizedMacAddress + " mengirim auth_key yang benar."
+                                    );
                                     return;
                                 }
 
@@ -766,30 +778,99 @@ public class ScanBluetooth extends AbstractGBActivity implements AdapterView.OnI
                                         .putString(PREF_AUTH_KEY, fetchedAuthKey.trim())
                                         .putLong(PREF_AUTH_KEY_SYNCED_AT, System.currentTimeMillis())
                                         .apply();
-                                toast(ScanBluetooth.this, "Auth key berhasil diperbarui dari server", Toast.LENGTH_SHORT, GB.INFO);
+                                showAuthKeyReadyToast(false);
 
                                 if (onSuccess != null) {
                                     onSuccess.run();
                                 }
                             } catch (JSONException e) {
-                                e.printStackTrace();
+                                LOG.warn("Failed parsing device auth key response", e);
+                                showAuthKeyErrorDialog(
+                                        "Respons auth key tidak sesuai",
+                                        "Server merespons, tetapi format datanya belum sesuai. Pastikan response berupa JSON dengan field auth_key."
+                                );
                             }
                         } else if (code == 422 || code == 401 || code == 404) {
-                            try {
-                                JSONObject response = new JSONObject(http.getResponse());
-                                String msg = response.optString("message", "Gagal mengambil auth key device.");
-                                toast(ScanBluetooth.this, msg, Toast.LENGTH_SHORT, GB.ERROR);
-                            } catch (JSONException e) {
-                                LOG.warn("Failed parsing device auth key error response", e);
-                                toast(ScanBluetooth.this, "Gagal mengambil auth key device.", Toast.LENGTH_SHORT, GB.ERROR);
-                            }
+                            String msg = extractAuthKeyApiMessage(http.getResponse());
+                            showAuthKeyErrorDialog("Auth key belum siap", buildAuthKeyErrorMessage(code, normalizedMacAddress, msg));
                         } else {
-                            toast(ScanBluetooth.this, "Error get device registration auth key", Toast.LENGTH_SHORT, GB.ERROR);
+                            showAuthKeyErrorDialog("Gagal mengambil auth key", buildAuthKeyErrorMessage(code, normalizedMacAddress, null));
                         }
                     }
                 });
             }
         }).start();
+    }
+
+    private void dismissProgress(final ProgressDialog progressDialog) {
+        if (progressDialog == null) {
+            return;
+        }
+
+        try {
+            if (progressDialog.isShowing() && !isFinishing()) {
+                progressDialog.dismiss();
+            }
+        } catch (final Exception e) {
+            LOG.warn("Failed dismissing auth key progress dialog", e);
+        }
+    }
+
+    private void showAuthKeyReadyToast(final boolean fromCache) {
+        final String source = fromCache ? "Auth key lokal siap." : "Auth key berhasil diambil.";
+        toast(ScanBluetooth.this, source + " Menghubungkan ke wearable...", Toast.LENGTH_LONG, GB.INFO);
+    }
+
+    private String extractAuthKeyApiMessage(final String responseBody) {
+        if (responseBody == null || responseBody.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            JSONObject response = new JSONObject(responseBody);
+            String message = response.optString("message", "").trim();
+            return message.isEmpty() ? null : message;
+        } catch (JSONException e) {
+            LOG.warn("Failed parsing device auth key error response", e);
+            return null;
+        }
+    }
+
+    private String buildAuthKeyErrorMessage(final Integer code, final String macAddress, final String apiMessage) {
+        final String serverMessage = apiMessage == null || apiMessage.trim().isEmpty()
+                ? ""
+                : "\n\nPesan server: " + apiMessage.trim();
+
+        if (code == null || code == 0) {
+            return "Aplikasi belum bisa menghubungi server untuk mengambil auth key.\n\nPeriksa koneksi internet, alamat API, lalu coba sambungkan ulang." + serverMessage;
+        }
+
+        if (code == 401) {
+            return "Sesi login tidak valid atau sudah kedaluwarsa. Silakan login ulang, lalu coba sambungkan perangkat lagi." + serverMessage;
+        }
+
+        if (code == 404) {
+            return "MAC " + macAddress + " belum terdaftar di server.\n\nPastikan perangkat sudah didaftarkan di backend dengan MAC yang sama, lalu coba lagi." + serverMessage;
+        }
+
+        if (code == 422) {
+            return "Data perangkat belum bisa diproses server.\n\nPastikan MAC " + macAddress + " dan company user sudah sesuai di backend." + serverMessage;
+        }
+
+        return "Server belum mengirim auth key untuk perangkat ini. Status HTTP: " + code + ".\n\nCoba lagi setelah koneksi/API dipastikan normal." + serverMessage;
+    }
+
+    private void showAuthKeyErrorDialog(final String title, final String message) {
+        if (isFinishing()) {
+            toast(ScanBluetooth.this, message, Toast.LENGTH_LONG, GB.ERROR);
+            return;
+        }
+
+        new MaterialAlertDialogBuilder(ScanBluetooth.this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(R.string.ok, null)
+                .show();
     }
 
     private void showUnsupportedDeviceDialog(final GBDeviceCandidate deviceCandidate) {
