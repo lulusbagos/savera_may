@@ -57,6 +57,8 @@ import id.icapps.savera.activities.charts.SleepAnalysis.SleepSession;
 import id.icapps.savera.database.DBHandler;
 import id.icapps.savera.devices.DeviceCoordinator;
 import id.icapps.savera.devices.TimeSampleProvider;
+import id.icapps.savera.devices.xiaomi.XiaomiDailySummarySampleProvider;
+import id.icapps.savera.entities.XiaomiDailySummarySample;
 import id.icapps.savera.impl.GBDevice;
 import id.icapps.savera.model.ActivityKind;
 import id.icapps.savera.model.ActivitySample;
@@ -172,6 +174,12 @@ public class DaySleepChartFragment extends AbstractActivityChartFragment<DaySlee
                 if (stressEntries.isEmpty()) {
                     addIntEntriesFromActivitySamples(samples, tsOffset, stressEntries, "getStress");
                 }
+                if (spo2Entries.isEmpty()) {
+                    addDailySummaryEntries(db, device, tsOffset, tsFrom, tsTo, spo2Entries, true);
+                }
+                if (stressEntries.isEmpty()) {
+                    addDailySummaryEntries(db, device, tsOffset, tsFrom, tsTo, stressEntries, false);
+                }
 
                 if (!spo2Entries.isEmpty()) {
                     chartsData.getData().addDataSet(createOverlayDataSet(spo2Entries, "SpO2 (%)", Color.GREEN));
@@ -200,6 +208,49 @@ public class DaySleepChartFragment extends AbstractActivityChartFragment<DaySlee
         dataSet.setValueTextColor(CHART_TEXT_COLOR);
         dataSet.setAxisDependency(YAxis.AxisDependency.RIGHT);
         return dataSet;
+    }
+
+    private void addDailySummaryEntries(DBHandler db, GBDevice device, int tsOffset, int tsFrom, int tsTo, List<Entry> entries, boolean spo2) {
+        Integer value = getDailySummaryValue(db, device, tsFrom, tsTo, spo2);
+        if (value == null || value <= 0) {
+            return;
+        }
+
+        entries.add(new Entry(0, value));
+        entries.add(new Entry(tsTo - tsOffset, value));
+    }
+
+    private Integer getDailySummaryValue(DBHandler db, GBDevice device, int tsFrom, int tsTo, boolean spo2) {
+        try {
+            long dayStart = getDayStartMillis(tsTo);
+            long dayEnd = dayStart + TimeUnit.DAYS.toMillis(1) - 1;
+            XiaomiDailySummarySampleProvider provider = new XiaomiDailySummarySampleProvider(device, db.getDaoSession());
+            List<XiaomiDailySummarySample> summaries = provider.getAllSamples(dayStart, dayEnd);
+            if (summaries.isEmpty()) {
+                dayStart = getDayStartMillis(tsFrom);
+                dayEnd = dayStart + TimeUnit.DAYS.toMillis(1) - 1;
+                summaries = provider.getAllSamples(dayStart, dayEnd);
+            }
+            for (XiaomiDailySummarySample summary : summaries) {
+                Integer value = spo2 ? summary.getSpo2Avg() : summary.getStressAvg();
+                if (value != null && value > 0) {
+                    return value;
+                }
+            }
+        } catch (Exception ignored) {
+            // Daily summary is only available for some Xiaomi devices.
+        }
+        return null;
+    }
+
+    private long getDayStartMillis(int timestampSeconds) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(timestampSeconds * 1000L);
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar.getTimeInMillis();
     }
 
     private void addIntEntriesFromActivitySamples(List<? extends ActivitySample> samples, int tsOffset, List<Entry> entries, String methodName) {
