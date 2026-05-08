@@ -52,19 +52,38 @@
                 android:layout_marginBottom="@dimen/_20sdp"
                 tools:ignore="HardcodedText" />
 
-            <EditText
-                android:id="@+id/textPassword"
+            <FrameLayout
                 android:layout_width="@dimen/_250sdp"
                 android:layout_height="@dimen/_35sdp"
-                android:autofillHints=""
-                android:hint="Password"
-                android:inputType="textPassword"
-                android:background="@drawable/bg_input"
-                android:paddingHorizontal="@dimen/_10sdp"
-                android:drawableStart="@drawable/ic_lock"
-                android:drawablePadding="@dimen/_5sdp"
-                android:layout_marginBottom="@dimen/_20sdp"
-                tools:ignore="HardcodedText" />
+                android:layout_marginBottom="@dimen/_20sdp">
+
+                <EditText
+                    android:id="@+id/textPassword"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:autofillHints=""
+                    android:background="@drawable/bg_input"
+                    android:drawableStart="@drawable/ic_lock"
+                    android:drawablePadding="@dimen/_5sdp"
+                    android:hint="Password"
+                    android:inputType="textPassword"
+                    android:paddingLeft="@dimen/_10sdp"
+                    android:paddingRight="@dimen/_38sdp"
+                    tools:ignore="HardcodedText,RtlHardcoded" />
+
+                <ImageButton
+                    android:id="@+id/btnTogglePassword"
+                    android:layout_width="@dimen/_34sdp"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="end|center_vertical"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="Lihat password"
+                    android:padding="@dimen/_8sdp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_visibility"
+                    android:tint="#606A78"
+                    tools:ignore="HardcodedText" />
+            </FrameLayout>
 
             <CheckBox
                 android:id="@+id/rememberMe"

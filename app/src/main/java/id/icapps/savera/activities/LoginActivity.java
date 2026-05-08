@@ -8,11 +8,13 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.Log;
 import android.util.Patterns;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -42,7 +44,9 @@ public class LoginActivity extends AppCompatActivity {
     private CheckBox rememberMe;
     private TextView textVersion;
     private Button btnLogin;
+    private ImageButton btnTogglePassword;
     private String user, password;
+    private boolean passwordVisible = false;
     private boolean activityTrackerAvailable = false;
     private LocalStorage localStorage;
     private ProgressDialog progressDialog;
@@ -72,6 +76,7 @@ public class LoginActivity extends AppCompatActivity {
         textVersion = findViewById(R.id.textVersion);
         textUser = findViewById(R.id.textUser);
         textPassword = findViewById(R.id.textPassword);
+        btnTogglePassword = findViewById(R.id.btnTogglePassword);
         rememberMe = findViewById(R.id.rememberMe);
         btnLogin = findViewById(R.id.btnLogin);
 
@@ -84,6 +89,7 @@ public class LoginActivity extends AppCompatActivity {
         }
 
         btnLogin.setOnClickListener(view -> checkLogin());
+        btnTogglePassword.setOnClickListener(view -> togglePasswordVisibility());
 
         PackageManager manager = this.getPackageManager();
         try {
@@ -95,6 +101,21 @@ public class LoginActivity extends AppCompatActivity {
             textVersion.setText("Versi -");
             localStorage.setVersion("Savera X -");
         }
+    }
+
+    private void togglePasswordVisibility() {
+        passwordVisible = !passwordVisible;
+        int selection = textPassword.getSelectionStart();
+        if (passwordVisible) {
+            textPassword.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+            btnTogglePassword.setImageResource(R.drawable.ic_visibility_off);
+            btnTogglePassword.setContentDescription("Sembunyikan password");
+        } else {
+            textPassword.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            btnTogglePassword.setImageResource(R.drawable.ic_visibility);
+            btnTogglePassword.setContentDescription("Lihat password");
+        }
+        textPassword.setSelection(Math.max(0, Math.min(selection, textPassword.length())));
     }
 
     private void checkLogin() {
