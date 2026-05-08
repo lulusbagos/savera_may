@@ -61,6 +61,7 @@ import id.icapps.savera.impl.GBDevice;
 import id.icapps.savera.model.ActivityKind;
 import id.icapps.savera.model.ActivitySample;
 import id.icapps.savera.model.Spo2Sample;
+import id.icapps.savera.model.StressSample;
 import id.icapps.savera.util.DateTimeUtils;
 import id.icapps.savera.util.Prefs;
 
@@ -128,7 +129,7 @@ public class DaySleepChartFragment extends AbstractActivityChartFragment<DaySlee
         }
         DefaultChartsData<LineData> chartsData = refresh(device, samples);
 
-        // Load SpO2 data and add as last dataset (Activity was skipped via createDataSet override)
+        // Load SpO2 and stress data as overlay lines (Activity was skipped via createDataSet override)
         if (!samples.isEmpty()) {
             try {
                 DeviceCoordinator coordinator = device.getDeviceCoordinator();
@@ -136,6 +137,7 @@ public class DaySleepChartFragment extends AbstractActivityChartFragment<DaySlee
                 int tsFrom = tsOffset;
                 int tsTo = samples.get(samples.size() - 1).getTimestamp();
                 List<Entry> spo2Entries = new ArrayList<>();
+                List<Entry> stressEntries = new ArrayList<>();
 
                 if (coordinator.supportsSpo2(device)) {
                     TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(device, db.getDaoSession());
@@ -150,25 +152,35 @@ public class DaySleepChartFragment extends AbstractActivityChartFragment<DaySlee
                         }
                     }
                 }
+                if (coordinator.supportsStressMeasurement()) {
+                    TimeSampleProvider<? extends StressSample> stressProvider = coordinator.getStressSampleProvider(device, db.getDaoSession());
+                    if (stressProvider != null) {
+                        List<? extends StressSample> stressSamples = stressProvider.getAllSamples(tsFrom * 1000L, tsTo * 1000L);
+                        for (StressSample stress : stressSamples) {
+                            int ts = (int) (stress.getTimestamp() / 1000) - tsOffset;
+                            int val = stress.getStress();
+                            if (val > 0) {
+                                stressEntries.add(new Entry(ts, val));
+                            }
+                        }
+                    }
+                }
 
                 if (spo2Entries.isEmpty()) {
-                    addSpo2EntriesFromActivitySamples(samples, tsOffset, spo2Entries);
+                    addIntEntriesFromActivitySamples(samples, tsOffset, spo2Entries, "getSpo2");
+                }
+                if (stressEntries.isEmpty()) {
+                    addIntEntriesFromActivitySamples(samples, tsOffset, stressEntries, "getStress");
                 }
 
                 if (!spo2Entries.isEmpty()) {
-                    LineDataSet spo2Set = new LineDataSet(spo2Entries, "SpO2 (%)");
-                    spo2Set.setLineWidth(2f);
-                    spo2Set.setColor(Color.GREEN);
-                    spo2Set.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
-                    spo2Set.setCubicIntensity(0.1f);
-                    spo2Set.setDrawCircles(false);
-                    spo2Set.setDrawValues(false);
-                    spo2Set.setValueTextColor(CHART_TEXT_COLOR);
-                    spo2Set.setAxisDependency(YAxis.AxisDependency.RIGHT);
-                    chartsData.getData().addDataSet(spo2Set);
+                    chartsData.getData().addDataSet(createOverlayDataSet(spo2Entries, "SpO2 (%)", Color.GREEN));
+                }
+                if (!stressEntries.isEmpty()) {
+                    chartsData.getData().addDataSet(createOverlayDataSet(stressEntries, "Stress", Color.MAGENTA));
                 }
             } catch (Exception e) {
-                LOG.warn("Could not load SpO2 data for sleep chart", e);
+                LOG.warn("Could not load SpO2/stress data for sleep chart", e);
             }
         }
 
@@ -177,19 +189,32 @@ public class DaySleepChartFragment extends AbstractActivityChartFragment<DaySlee
         return new MyChartsData(mySleepChartsData, chartsData, hrData.getLeft(), hrData.getMiddle(), hrData.getRight(), intensityData.getLeft(), intensityData.getMiddle(), intensityData.getRight());
     }
 
-    private void addSpo2EntriesFromActivitySamples(List<? extends ActivitySample> samples, int tsOffset, List<Entry> spo2Entries) {
+    private LineDataSet createOverlayDataSet(List<Entry> entries, String label, int color) {
+        LineDataSet dataSet = new LineDataSet(entries, label);
+        dataSet.setLineWidth(2f);
+        dataSet.setColor(color);
+        dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
+        dataSet.setCubicIntensity(0.1f);
+        dataSet.setDrawCircles(false);
+        dataSet.setDrawValues(false);
+        dataSet.setValueTextColor(CHART_TEXT_COLOR);
+        dataSet.setAxisDependency(YAxis.AxisDependency.RIGHT);
+        return dataSet;
+    }
+
+    private void addIntEntriesFromActivitySamples(List<? extends ActivitySample> samples, int tsOffset, List<Entry> entries, String methodName) {
         for (ActivitySample sample : samples) {
             try {
-                java.lang.reflect.Method method = sample.getClass().getMethod("getSpo2");
+                java.lang.reflect.Method method = sample.getClass().getMethod(methodName);
                 Object value = method.invoke(sample);
                 if (value instanceof Number) {
-                    int spo2 = ((Number) value).intValue();
-                    if (spo2 > 0) {
-                        spo2Entries.add(new Entry(sample.getTimestamp() - tsOffset, spo2));
+                    int intValue = ((Number) value).intValue();
+                    if (intValue > 0) {
+                        entries.add(new Entry(sample.getTimestamp() - tsOffset, intValue));
                     }
                 }
             } catch (Exception ignored) {
-                // Some activity sample classes do not expose SpO2 fields.
+                // Some activity sample classes do not expose SpO2/stress fields.
             }
         }
     }
@@ -535,7 +560,7 @@ public class DaySleepChartFragment extends AbstractActivityChartFragment<DaySlee
         yAxisRight.setDrawTopYLabelEntry(true);
         yAxisRight.setTextColor(CHART_TEXT_COLOR);
         yAxisRight.setAxisMaximum(105f);  // SpO2 max + headroom
-        yAxisRight.setAxisMinimum(40f);   // accommodate both SpO2 (80-100) and HR (50-80)
+        yAxisRight.setAxisMinimum(0f);    // accommodate stress (1-100), SpO2 (80-100), and HR
     }
 
     @Override
@@ -551,6 +576,11 @@ public class DaySleepChartFragment extends AbstractActivityChartFragment<DaySlee
         spo2Entry.label = "SpO2 (%)";
         spo2Entry.formColor = Color.GREEN;
         legendEntries.add(spo2Entry);
+
+        LegendEntry stressEntry = new LegendEntry();
+        stressEntry.label = "Stress";
+        stressEntry.formColor = Color.MAGENTA;
+        legendEntries.add(stressEntry);
 
         LegendEntry lightSleepEntry = new LegendEntry();
         lightSleepEntry.label = getActivity().getString(R.string.sleep_colored_stats_light);

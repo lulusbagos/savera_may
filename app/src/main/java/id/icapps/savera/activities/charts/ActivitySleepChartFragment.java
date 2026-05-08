@@ -49,6 +49,7 @@ import id.icapps.savera.devices.TimeSampleProvider;
 import id.icapps.savera.impl.GBDevice;
 import id.icapps.savera.model.ActivitySample;
 import id.icapps.savera.model.Spo2Sample;
+import id.icapps.savera.model.StressSample;
 
 
 public class ActivitySleepChartFragment extends AbstractActivityChartFragment<DefaultChartsData<LineData>> {
@@ -110,7 +111,7 @@ public class ActivitySleepChartFragment extends AbstractActivityChartFragment<De
         yAxisRight.setDrawTopYLabelEntry(true);
         yAxisRight.setTextColor(CHART_TEXT_COLOR);
         yAxisRight.setAxisMaximum(105f);
-        yAxisRight.setAxisMinimum(40f);
+        yAxisRight.setAxisMinimum(0f);
 
         // refresh immediately instead of use refreshIfVisible(), for perceived performance
         refresh();
@@ -144,6 +145,7 @@ public class ActivitySleepChartFragment extends AbstractActivityChartFragment<De
                 int tsTo = samples.get(samples.size() - 1).getTimestamp();
 
                 List<Entry> spo2Entries = new ArrayList<>();
+                List<Entry> stressEntries = new ArrayList<>();
 
                 if (coordinator.supportsSpo2(device)) {
                     TimeSampleProvider<? extends Spo2Sample> spo2Provider = coordinator.getSpo2SampleProvider(device, db.getDaoSession());
@@ -158,44 +160,67 @@ public class ActivitySleepChartFragment extends AbstractActivityChartFragment<De
                         }
                     }
                 }
+                if (coordinator.supportsStressMeasurement()) {
+                    TimeSampleProvider<? extends StressSample> stressProvider = coordinator.getStressSampleProvider(device, db.getDaoSession());
+                    if (stressProvider != null) {
+                        List<? extends StressSample> stressSamples = stressProvider.getAllSamples(tsFrom * 1000L, tsTo * 1000L);
+                        for (StressSample stressSample : stressSamples) {
+                            int x = (int) (stressSample.getTimestamp() / 1000) - tsOffset;
+                            int stress = stressSample.getStress();
+                            if (stress > 0) {
+                                stressEntries.add(new Entry(x, stress));
+                            }
+                        }
+                    }
+                }
 
                 if (spo2Entries.isEmpty()) {
-                    addSpo2EntriesFromActivitySamples(samples, tsOffset, spo2Entries);
+                    addIntEntriesFromActivitySamples(samples, tsOffset, spo2Entries, "getSpo2");
+                }
+                if (stressEntries.isEmpty()) {
+                    addIntEntriesFromActivitySamples(samples, tsOffset, stressEntries, "getStress");
                 }
 
                 if (!spo2Entries.isEmpty()) {
-                    LineDataSet spo2Set = new LineDataSet(spo2Entries, "SpO2 (%)");
-                    spo2Set.setLineWidth(2f);
-                    spo2Set.setColor(Color.GREEN);
-                    spo2Set.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
-                    spo2Set.setCubicIntensity(0.1f);
-                    spo2Set.setDrawCircles(false);
-                    spo2Set.setDrawValues(false);
-                    spo2Set.setValueTextColor(CHART_TEXT_COLOR);
-                    spo2Set.setAxisDependency(YAxis.AxisDependency.RIGHT);
-                    chartData.getData().addDataSet(spo2Set);
+                    chartData.getData().addDataSet(createOverlayDataSet(spo2Entries, "SpO2 (%)", Color.GREEN));
+                }
+                if (!stressEntries.isEmpty()) {
+                    chartData.getData().addDataSet(createOverlayDataSet(stressEntries, "Stress", Color.MAGENTA));
                 }
             } catch (Exception e) {
-                LOG.warn("Could not load SpO2 data for sleep chart", e);
+                LOG.warn("Could not load SpO2/stress data for sleep chart", e);
             }
         }
 
         return chartData;
     }
 
-    private void addSpo2EntriesFromActivitySamples(List<? extends ActivitySample> samples, int tsOffset, List<Entry> spo2Entries) {
+    private LineDataSet createOverlayDataSet(List<Entry> entries, String label, int color) {
+        LineDataSet dataSet = new LineDataSet(entries, label);
+        dataSet.setLineWidth(2f);
+        dataSet.setColor(color);
+        dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
+        dataSet.setCubicIntensity(0.1f);
+        dataSet.setDrawCircles(false);
+        dataSet.setDrawValues(false);
+        dataSet.setValueTextColor(CHART_TEXT_COLOR);
+        dataSet.setAxisDependency(YAxis.AxisDependency.RIGHT);
+        return dataSet;
+    }
+
+    private void addIntEntriesFromActivitySamples(List<? extends ActivitySample> samples, int tsOffset, List<Entry> entries, String methodName) {
         for (ActivitySample sample : samples) {
             try {
-                java.lang.reflect.Method method = sample.getClass().getMethod("getSpo2");
+                java.lang.reflect.Method method = sample.getClass().getMethod(methodName);
                 Object value = method.invoke(sample);
                 if (value instanceof Number) {
-                    int spo2 = ((Number) value).intValue();
-                    if (spo2 > 0) {
-                        spo2Entries.add(new Entry(sample.getTimestamp() - tsOffset, spo2));
+                    int intValue = ((Number) value).intValue();
+                    if (intValue > 0) {
+                        entries.add(new Entry(sample.getTimestamp() - tsOffset, intValue));
                     }
                 }
             } catch (Exception ignored) {
-                // Some activity sample classes do not expose SpO2 fields.
+                // Some activity sample classes do not expose SpO2/stress fields.
             }
         }
     }
@@ -222,6 +247,11 @@ public class ActivitySleepChartFragment extends AbstractActivityChartFragment<De
         spo2Entry.label = "SpO2 (%)";
         spo2Entry.formColor = Color.GREEN;
         legendEntries.add(spo2Entry);
+
+        LegendEntry stressEntry = new LegendEntry();
+        stressEntry.label = "Stress";
+        stressEntry.formColor = Color.MAGENTA;
+        legendEntries.add(stressEntry);
 
         LegendEntry lightSleepEntry = new LegendEntry();
         lightSleepEntry.label = akLightSleep.label;
