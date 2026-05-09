@@ -160,6 +160,8 @@ public class MyDashboard extends Fragment {
     private final Object metricJsonLock = new Object();
     private final AtomicBoolean pendingUploadFlushRunning = new AtomicBoolean(false);
     private final AtomicBoolean sleepSnapshotRunning = new AtomicBoolean(false);
+    private final AtomicBoolean p5mUploadCheckRunning = new AtomicBoolean(false);
+    private boolean p5mUploadGatePassed = false;
 
     // Queue-wait polling state — keeps overlay open until queued item is sent
     private static final int QUEUE_WAIT_MAX_POLLS = 40;   // 40 × 3s ≈ 2 menit
@@ -1569,26 +1571,20 @@ public class MyDashboard extends Fragment {
             return;
         }
         
-        // Validate fit to work (skip for developer mode as it's auto-set)
-        if (!isDeveloperMode() && !isSleepUploaderAccount() && (isFit1 < 0 || isFit2 < 0 || isFit3 < 0)) {
+        // Validate fit to work (skip only for developer mode as it's auto-set)
+        if (!isDeveloperMode() && (isFit1 < 0 || isFit2 < 0 || isFit3 < 0)) {
             showUploadProgressOverlay(false);
             toast(requireActivity(), "Fit to work harus diisi!", Toast.LENGTH_SHORT, GB.ERROR);
             return;
         }
         
-        // Validate P5M (skip for developer mode as it's auto-set)
-        if (!isDeveloperMode() && !isSleepUploaderAccount() && !hasP5MSubmissionForToday()) {
-            showUploadProgressOverlay(false);
-            toast(requireActivity(), "Anda belum mengisi P5M!", Toast.LENGTH_SHORT, GB.ERROR);
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    assert getActivity() != null;
-                    ((HomeActivity) getActivity()).changeViewPagerPostition(8);
-                }
-            }, 1000);
+        // Validate P5M. If there is an active/fallback P5M, it must be submitted before upload.
+        // If backend has no active P5M configured, upload can continue.
+        if (!isDeveloperMode() && !isSleepUploaderAccount() && !p5mUploadGatePassed && !hasP5MSubmissionForToday()) {
+            checkP5MRequirementBeforeUpload(view);
             return;
         }
+        p5mUploadGatePassed = false;
 
         // All validations passed, proceed with upload
         adaptUploadRouteForCurrentNetwork();
@@ -2364,6 +2360,115 @@ public class MyDashboard extends Fragment {
             LOG.warn("Failed parsing cached P5M answers", e);
             return false;
         }
+    }
+
+    private void checkP5MRequirementBeforeUpload(View retryView) {
+        Context context = getContext();
+        if (context == null) {
+            showUploadProgressOverlay(false);
+            return;
+        }
+
+        if (!p5mUploadCheckRunning.compareAndSet(false, true)) {
+            return;
+        }
+
+        updateUploadProgress("Memeriksa status P5M...", 0, 2);
+        String url = getString(R.string.base_url) + "/p5m";
+
+        new Thread(() -> {
+            Http http = new Http(context, url);
+            http.setMethod("get");
+            http.setToken(true);
+            http.setBypassCache(true);
+            http.setConnectTimeoutMs(8000);
+            http.setReadTimeoutMs(12000);
+            http.setMaxAttempts(1);
+            http.send();
+
+            Activity activity = getActivity();
+            if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+                p5mUploadCheckRunning.set(false);
+                return;
+            }
+
+            activity.runOnUiThread(() -> {
+                p5mUploadCheckRunning.set(false);
+                handleP5MUploadCheckResponse(http, retryView);
+            });
+        }).start();
+    }
+
+    private void handleP5MUploadCheckResponse(Http http, View retryView) {
+        int statusCode = http.getStatusCode() == null ? 0 : http.getStatusCode();
+        if (statusCode != 200) {
+            continueUploadAfterP5MWarning(retryView);
+            return;
+        }
+
+        try {
+            JSONObject response = new JSONObject(Objects.requireNonNullElse(http.getResponse(), "{}"));
+            JSONObject data = response.optJSONObject("data");
+            if (data == null) {
+                continueUploadAfterP5MWarning(retryView);
+                return;
+            }
+
+            boolean submitted = data.optBoolean("already_submitted", false) || data.optJSONObject("today_score") != null;
+            if (submitted) {
+                markTodayP5MSubmitted();
+                p5mUploadGatePassed = true;
+                showUploadProgressOverlay(false);
+                sendSummary(retryView);
+                return;
+            }
+
+            JSONObject quiz = data.optJSONObject("quiz");
+            JSONArray items = data.optJSONArray("items");
+            boolean hasActiveQuiz = quiz != null && items != null && items.length() > 0;
+            if (!hasActiveQuiz) {
+                p5mUploadGatePassed = true;
+                showUploadProgressOverlay(false);
+                sendSummary(retryView);
+                return;
+            }
+
+            showUploadProgressOverlay(false);
+            toast(requireActivity(), getString(R.string.p5m_required_before_upload), Toast.LENGTH_LONG, GB.ERROR);
+            navigateToP5M();
+        } catch (JSONException e) {
+            LOG.warn("Failed parsing P5M upload check response", e);
+            continueUploadAfterP5MWarning(retryView);
+        }
+    }
+
+    private void continueUploadAfterP5MWarning(View retryView) {
+        toast(requireActivity(), getString(R.string.p5m_check_failed_before_upload), Toast.LENGTH_LONG, GB.WARN);
+        p5mUploadGatePassed = true;
+        showUploadProgressOverlay(false);
+        sendSummary(retryView);
+    }
+
+    private void markTodayP5MSubmitted() {
+        String nik = String.valueOf(textNik.getText()).trim();
+        if (nik.isBlank()) {
+            return;
+        }
+
+        String today = new SimpleDateFormat("E, dd MMM yyyy", Locale.getDefault()).format(System.currentTimeMillis());
+        localStorage.setP5M(nik + "_" + today);
+    }
+
+    private void navigateToP5M() {
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                Activity activity = getActivity();
+                if (activity instanceof HomeActivity) {
+                    ((HomeActivity) activity).changeViewPagerPostition(8);
+                }
+            }
+        }, 700);
     }
 
     private boolean isTodayP5MMarker(String marker) {
@@ -3770,9 +3875,7 @@ public class MyDashboard extends Fragment {
             long sleepYesterdayMinutes = totalY[0] + totalY[1] + totalY[2];
             long sleepRestMinutes = totalR[0] + totalR[1] + totalR[2];
             long wearableTotalMinutes = sleepTodayMinutes
-                    + sleepYesterdayMinutes
-                    + totalS[3]
-                    + totalY[3];
+                    + totalS[3];
 
             return new long[]{totalS[0], totalS[1], totalS[2], totalS[3], sleepTodayMinutes, sleepYesterdayMinutes, sleepRestMinutes, wearableTotalMinutes};
         }
@@ -3804,7 +3907,7 @@ public class MyDashboard extends Fragment {
                     remSleepTotalMinutes += sleep[2];
                     awakeSleepTotalMinutes += sleep[3];
                     sleepToday += sleep[4];
-                    sleepYesterday += sleep[5];
+                    sleepYesterday += capYesterdaySleepMinutes(sleep[5]);
                     sleepRest += sleep[6];
                     long sleepWithoutAwake = sleep[4] + capYesterdaySleepMinutes(sleep[5]);
                     sleepTotalMinutes += sleepWithoutAwake;

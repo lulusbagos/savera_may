@@ -122,7 +122,13 @@ public class LoginActivity extends AppCompatActivity {
         user = textUser.getText().toString().trim();
         password = textPassword.getText().toString();
         if (user.isEmpty() || password.isEmpty()) {
-            toast(LoginActivity.this, "User and Password are required", Toast.LENGTH_SHORT, GB.ERROR);
+            if (user.isEmpty()) {
+                textUser.setError("User/NIK wajib diisi");
+            }
+            if (password.isEmpty()) {
+                textPassword.setError("Password wajib diisi");
+            }
+            toast(LoginActivity.this, "User/NIK dan password wajib diisi.", Toast.LENGTH_SHORT, GB.ERROR);
         } else {
             // Developer bypass mode - offline login
             if (user.equals("developer") && password.equals("270595")) {
@@ -191,7 +197,7 @@ public class LoginActivity extends AppCompatActivity {
 
         List<String> companyCandidates = resolveCompanyCandidates();
         if (companyIndex < 0 || companyIndex >= companyCandidates.size()) {
-            toast(LoginActivity.this, "Company not found.", Toast.LENGTH_SHORT, GB.ERROR);
+            toast(LoginActivity.this, "Company tidak ditemukan. Silakan hubungi admin.", Toast.LENGTH_SHORT, GB.ERROR);
             return;
         }
         String companyHeader = companyCandidates.get(companyIndex);
@@ -224,7 +230,7 @@ public class LoginActivity extends AppCompatActivity {
 
         // Show progress dialog
         progressDialog = new ProgressDialog(LoginActivity.this);
-        progressDialog.setMessage("Logging in...");
+        progressDialog.setMessage("Memeriksa akun...");
         progressDialog.setCancelable(false);
         progressDialog.show();
 
@@ -252,7 +258,7 @@ public class LoginActivity extends AppCompatActivity {
                         Log.d(TAG, "Login response code: " + code);
                         
                         if (code == null || code == 0) {
-                            toast(LoginActivity.this, "No response from server. Check your internet connection.", Toast.LENGTH_LONG, GB.ERROR);
+                            toast(LoginActivity.this, "Server tidak merespons. Periksa koneksi internet lalu coba lagi.", Toast.LENGTH_LONG, GB.ERROR);
                             return;
                         }
 
@@ -260,7 +266,7 @@ public class LoginActivity extends AppCompatActivity {
                             try {
                                 String response = http.getResponse();
                                 if (response == null || response.isEmpty()) {
-                                    toast(LoginActivity.this, "Empty response from server", Toast.LENGTH_SHORT, GB.ERROR);
+                                    toast(LoginActivity.this, "Server belum mengirim data login. Silakan coba lagi.", Toast.LENGTH_SHORT, GB.ERROR);
                                     return;
                                 }
                                 
@@ -277,52 +283,45 @@ public class LoginActivity extends AppCompatActivity {
                                 getProfile();
                             } catch (JSONException e) {
                                 Log.e(TAG, "Error parsing login response", e);
-                                toast(LoginActivity.this, "Invalid server response", Toast.LENGTH_SHORT, GB.ERROR);
+                                toast(LoginActivity.this, "Format data login dari server tidak sesuai.", Toast.LENGTH_SHORT, GB.ERROR);
                             }
                         } else if (code == 422 || code == 401 || code == 403 || code == 404) {
-                            try {
-                                String response = http.getResponse();
-                                String msg = "Login failed (Error " + code + ")";
-                                if (response != null && !response.isEmpty()) {
-                                    JSONObject responseObj = new JSONObject(response);
-                                    msg = responseObj.optString("message", msg);
-                                }
+                            String response = http.getResponse();
+                            String msg = extractApiMessage(response, "Login ditolak oleh server.");
 
-                                if (containsCompanyNotFound(msg)) {
-                                    int nextCompanyIndex = companyIndex + 1;
-                                    if (nextCompanyIndex < companyCandidates.size()) {
-                                        Log.d(TAG, "Company not found for " + companyHeader + ", retrying with next company candidate");
-                                        sendLogin(nextCompanyIndex, false, true);
-                                        return;
-                                    }
-                                }
-
-                                if (allowCompanyPrefixRetry && !useCompanyPrefix && !Patterns.EMAIL_ADDRESS.matcher(user).matches() && !companyHeader.isEmpty()) {
-                                    Log.d(TAG, "Login rejected for raw username, retrying once with company prefix");
-                                    sendLogin(companyIndex, true, false);
+                            if (containsCompanyNotFound(msg)) {
+                                int nextCompanyIndex = companyIndex + 1;
+                                if (nextCompanyIndex < companyCandidates.size()) {
+                                    Log.d(TAG, "Company not found for " + companyHeader + ", retrying with next company candidate");
+                                    sendLogin(nextCompanyIndex, false, true);
                                     return;
                                 }
-
-                                if (!Patterns.EMAIL_ADDRESS.matcher(user).matches() && containsInvalidCredentials(msg)) {
-                                    int nextCompanyIndex = companyIndex + 1;
-                                    if (nextCompanyIndex < companyCandidates.size()) {
-                                        Log.d(TAG, "Invalid credentials for company " + companyHeader + ", retrying with next company candidate");
-                                        sendLogin(nextCompanyIndex, false, allowCompanyPrefixRetry);
-                                        return;
-                                    }
-                                }
-
-                                toast(LoginActivity.this, msg, Toast.LENGTH_SHORT, GB.ERROR);
-                            } catch (JSONException e) {
-                                Log.e(TAG, "Error parsing error response", e);
-                                toast(LoginActivity.this, "Login failed (Error " + code + ")", Toast.LENGTH_SHORT, GB.ERROR);
                             }
+
+                            if (allowCompanyPrefixRetry && !useCompanyPrefix && !Patterns.EMAIL_ADDRESS.matcher(user).matches() && !companyHeader.isEmpty()) {
+                                Log.d(TAG, "Login rejected for raw username, retrying once with company prefix");
+                                sendLogin(companyIndex, true, false);
+                                return;
+                            }
+
+                            if (!Patterns.EMAIL_ADDRESS.matcher(user).matches() && containsInvalidCredentials(msg)) {
+                                int nextCompanyIndex = companyIndex + 1;
+                                if (nextCompanyIndex < companyCandidates.size()) {
+                                    Log.d(TAG, "Invalid credentials for company " + companyHeader + ", retrying with next company candidate");
+                                    sendLogin(nextCompanyIndex, false, allowCompanyPrefixRetry);
+                                    return;
+                                }
+                            }
+
+                            String userMessage = buildLoginErrorMessage(code, msg);
+                            applyLoginFieldError(code, msg);
+                            toast(LoginActivity.this, userMessage, Toast.LENGTH_LONG, GB.ERROR);
                         } else {
-                            toast(LoginActivity.this, "Error user login (HTTP " + code + ")", Toast.LENGTH_SHORT, GB.ERROR);
+                            toast(LoginActivity.this, "Login belum berhasil. Server mengembalikan HTTP " + code + ".", Toast.LENGTH_SHORT, GB.ERROR);
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error processing login response", e);
-                        toast(LoginActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT, GB.ERROR);
+                        toast(LoginActivity.this, "Terjadi kendala saat memproses login. Silakan coba lagi.", Toast.LENGTH_SHORT, GB.ERROR);
                     }
                 });
             } catch (Exception e) {
@@ -331,7 +330,7 @@ public class LoginActivity extends AppCompatActivity {
                     if (progressDialog != null && progressDialog.isShowing()) {
                         progressDialog.dismiss();
                     }
-                    toast(LoginActivity.this, "Network error: " + e.getMessage(), Toast.LENGTH_LONG, GB.ERROR);
+                    toast(LoginActivity.this, "Koneksi ke server gagal. Periksa internet lalu coba lagi.", Toast.LENGTH_LONG, GB.ERROR);
                 });
             }
         }).start();
@@ -551,7 +550,98 @@ public class LoginActivity extends AppCompatActivity {
         return normalized.contains("incorrect username or password")
                 || normalized.contains("credentials do not match")
                 || normalized.contains("these credentials do not match")
-                || normalized.contains("invalid credentials");
+                || normalized.contains("invalid credentials")
+                || normalized.contains("password salah")
+                || normalized.contains("wrong password");
+    }
+
+    private boolean containsUserNotFound(String message) {
+        if (message == null) {
+            return false;
+        }
+
+        String normalized = message.toLowerCase(Locale.ROOT);
+        return normalized.contains("user not found")
+                || normalized.contains("account not found")
+                || normalized.contains("employee not found")
+                || normalized.contains("nik not found")
+                || normalized.contains("email not found")
+                || normalized.contains("not registered")
+                || normalized.contains("tidak terdaftar")
+                || normalized.contains("akun tidak ditemukan")
+                || normalized.contains("user tidak ditemukan")
+                || normalized.contains("nik tidak ditemukan");
+    }
+
+    private String extractApiMessage(String responseBody, String fallback) {
+        if (responseBody == null || responseBody.trim().isEmpty()) {
+            return fallback;
+        }
+
+        try {
+            JSONObject responseObj = new JSONObject(responseBody);
+            String message = responseObj.optString("message", "").trim();
+            if (!message.isEmpty()) {
+                return message;
+            }
+
+            String error = responseObj.optString("error", "").trim();
+            if (!error.isEmpty()) {
+                return error;
+            }
+
+            Object errors = responseObj.opt("errors");
+            if (errors != null) {
+                String text = errors.toString().trim();
+                if (!text.isEmpty() && !"null".equalsIgnoreCase(text)) {
+                    return text;
+                }
+            }
+        } catch (JSONException e) {
+            Log.w(TAG, "Failed parsing login error response", e);
+        }
+
+        return fallback;
+    }
+
+    private String buildLoginErrorMessage(Integer code, String apiMessage) {
+        if (containsUserNotFound(apiMessage) || Integer.valueOf(404).equals(code)) {
+            return "User/NIK tidak terdaftar. Pastikan NIK atau email sudah benar, atau hubungi admin.";
+        }
+
+        if (containsInvalidCredentials(apiMessage)) {
+            return "Password salah. Periksa kembali password, lalu coba login lagi.";
+        }
+
+        if (Integer.valueOf(401).equals(code) || Integer.valueOf(403).equals(code)) {
+            return "Login ditolak. Pastikan user/NIK dan password sudah benar.";
+        }
+
+        if (Integer.valueOf(422).equals(code)) {
+            if (apiMessage != null && !apiMessage.trim().isEmpty()) {
+                return apiMessage.trim();
+            }
+            return "Data login belum valid. Periksa kembali user/NIK dan password.";
+        }
+
+        if (apiMessage != null && !apiMessage.trim().isEmpty()) {
+            return apiMessage.trim();
+        }
+
+        return "Login belum berhasil. Silakan coba lagi.";
+    }
+
+    private void applyLoginFieldError(Integer code, String apiMessage) {
+        if (containsUserNotFound(apiMessage) || Integer.valueOf(404).equals(code)) {
+            textUser.setError("User/NIK tidak terdaftar");
+            textUser.requestFocus();
+            return;
+        }
+
+        if (containsInvalidCredentials(apiMessage) || Integer.valueOf(401).equals(code) || Integer.valueOf(403).equals(code)) {
+            textPassword.setError("Password salah");
+            textPassword.requestFocus();
+        }
     }
 
     private void applyProfileContext(JSONObject responseObj, String companyHeader) throws JSONException {
