@@ -390,6 +390,8 @@ public class TicketActivity extends AppCompatActivity {
 
     private long extractSleepMinutes(JSONObject response) {
         String[] minuteKeys = {
+                "sleep_effective",
+                "sleep_effective_minutes",
                 "sleep",
                 "sleep_minutes",
                 "sleep_total_minutes",

@@ -749,7 +749,7 @@ public class MyDashboard extends Fragment {
                 (int) (totalSleepMinutes % 60f)
         );
         textSleep.setText(valueSleep);
-        textSleepType.setText("Total Sleep\n(" + myData1.sleepType + ")");
+        textSleepType.setText("Total Tidur Efektif\n(" + myData1.sleepType + ")");
         loadingSleep.setProgress((int) Math.floor(totalSleepMinutes / 60f));
 
         textSteps.setText(String.valueOf(myData1.getStepsTotal()));
@@ -766,22 +766,10 @@ public class MyDashboard extends Fragment {
         textWeight.setText("-");
         textVOMax.setText("-");
 
-        if (totalSleepMinutes >= 360) {
-            textInfo.setText("Langsung bekerja");
-            textInfo.setTextColor(getResources().getColor(R.color.hrv_status_balanced));
-        } else if (totalSleepMinutes >= 345) {
-            textInfo.setText("Dapat bekerja");
-            textInfo.setTextColor(getResources().getColor(R.color.hrv_status_balanced));
-        } else if (totalSleepMinutes >= 300) {
-            textInfo.setText("Istirahat minimal 1 jam (jam savera)\natau dipulangkan");
-            textInfo.setTextColor(getResources().getColor(R.color.hrv_status_unbalanced));
-        } else if (totalSleepMinutes >= 270) {
-            textInfo.setText("Istirahat minimal 2 jam (jam savera)\natau dipulangkan");
-            textInfo.setTextColor(getResources().getColor(R.color.hrv_status_unbalanced));
-        } else {
-            textInfo.setText("Langsung dipulangkan");
-            textInfo.setTextColor(getResources().getColor(R.color.hrv_status_char_line_color));
-        }
+        int sleepStatusColor = getSleepStatusColor(totalSleepMinutes);
+        textInfo.setText(getSleepStatusLabel(totalSleepMinutes));
+        textInfo.setTextColor(sleepStatusColor);
+        loadingSleep.setIndicatorColor(sleepStatusColor);
 
         final String tsFrom = new SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()).format(new Date(myData1.sleepFrom * 1000L));
         final String tsTo = new SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()).format(new Date(myData1.sleepTo * 1000L));
@@ -819,6 +807,32 @@ public class MyDashboard extends Fragment {
             return 0;
         }
         return data.sleepWearableTotalMinutes > 0 ? data.sleepWearableTotalMinutes : data.sleepTotalMinutes;
+    }
+
+    private String getSleepStatusLabel(long effectiveSleepMinutes) {
+        if (effectiveSleepMinutes < 270) {
+            return "Langsung dipulangkan";
+        }
+        if (effectiveSleepMinutes < 300) {
+            return "Istirahat minimal 2 jam (jam savera)";
+        }
+        if (effectiveSleepMinutes < 330) {
+            return "Istirahat minimal 1 jam (jam savera)";
+        }
+        if (effectiveSleepMinutes < 360) {
+            return "Dapat bekerja";
+        }
+        return "Langsung bekerja";
+    }
+
+    private int getSleepStatusColor(long effectiveSleepMinutes) {
+        if (effectiveSleepMinutes < 270) {
+            return getResources().getColor(R.color.hrv_status_char_line_color);
+        }
+        if (effectiveSleepMinutes < 330) {
+            return getResources().getColor(R.color.hrv_status_unbalanced);
+        }
+        return getResources().getColor(R.color.hrv_status_balanced);
     }
 
     @SuppressLint("SetTextI18n")
@@ -2261,6 +2275,11 @@ public class MyDashboard extends Fragment {
                 params.put("spo2", myData1.bloodOxygen);
                 params.put("stress", myData1.stress);
                 params.put("sleep", myData1.sleepTotalMinutes);
+                params.put("sleep_effective", myData1.sleepTotalMinutes);
+                params.put("sleep_effective_minutes", myData1.sleepTotalMinutes);
+                params.put("sleep_wearable", getWearableSleepTotalMinutes(myData1));
+                params.put("sleep_wearable_minutes", getWearableSleepTotalMinutes(myData1));
+                params.put("sleep_decision", getSleepStatusLabel(myData1.sleepTotalMinutes));
                 params.put("sleep_start", myData1.sleepFrom);
                 params.put("sleep_end", myData1.sleepTo);
                 params.put("sleep_type", myData1.sleepType);
@@ -2681,6 +2700,11 @@ public class MyDashboard extends Fragment {
         params.put("department_id", departmentId);
         params.put("shift_id", shiftId);
         params.put("sleep", sleepTotal);
+        params.put("sleep_effective", sleepTotal);
+        params.put("sleep_effective_minutes", sleepTotal);
+        params.put("sleep_wearable", sleepTotal + awakeSleep);
+        params.put("sleep_wearable_minutes", sleepTotal + awakeSleep);
+        params.put("sleep_decision", getSleepStatusLabel(sleepTotal));
         params.put("sleep_start", sleepFrom);
         params.put("sleep_end", sleepTo);
         params.put("sleep_type", sleepType);

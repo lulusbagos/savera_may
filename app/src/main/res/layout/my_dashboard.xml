@@ -172,7 +172,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:textSize="@dimen/_10sdp"
-                            android:text="Total Sleep"
+                            android:text="Total Tidur Efektif"
                             android:textColor="#FFF"
                             android:textAlignment="center"
                             tools:ignore="HardcodedText" />
@@ -199,7 +199,7 @@
                             android:layout_height="wrap_content"
                             android:textSize="@dimen/_10sdp"
                             android:textStyle="bold"
-                            android:text="Tidur Hari Ini"
+                            android:text="Tidur Efektif Hari Ini"
                             android:textColor="#FFF"
                             android:textAlignment="center"
                             tools:ignore="HardcodedText" />
@@ -228,7 +228,7 @@
                             android:layout_height="wrap_content"
                             android:textSize="@dimen/_10sdp"
                             android:textStyle="bold"
-                            android:text="Tidur Kemarin"
+                            android:text="Tidur Efektif Kemarin"
                             android:textColor="#FFF"
                             android:textAlignment="center"
                             tools:ignore="HardcodedText" />

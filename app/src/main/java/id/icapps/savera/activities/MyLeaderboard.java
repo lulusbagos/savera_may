@@ -358,7 +358,7 @@ public class MyLeaderboard extends Fragment {
             long rawDelta = TARGET_SLEEP_MINUTES - sleepMinutes;
             long debtMinutes = Math.max(0, rawDelta);
             long paidMinutes = Math.min(TARGET_SLEEP_MINUTES, sleepMinutes);
-            textSleep.setText("Target: 7 jam | Tidur: " + formatMinutes(sleepMinutes) + " | Terbayar: " + formatMinutes(paidMinutes));
+            textSleep.setText("Target: 7 jam | Tidur efektif: " + formatMinutes(sleepMinutes) + " | Terbayar: " + formatMinutes(paidMinutes));
 
             if (rawDelta > 0) {
                 textDebt.setText("Hutang: 7 jam - " + formatMinutes(sleepMinutes) + " = " + formatMinutes(debtMinutes));

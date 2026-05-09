@@ -456,7 +456,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Durasi Tidur"
+                        android:text="Durasi Tidur Efektif"
                         android:textColor="#516173"
                         android:textSize="11sp" />
 
