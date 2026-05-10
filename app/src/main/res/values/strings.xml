@@ -29,11 +29,15 @@
     <string name="p5m_submit">Kirim Jawaban P5M</string>
     <string name="p5m_submit_done">P5M Hari Ini Sudah Diisi</string>
     <string name="p5m_submit_success">P5M berhasil dikirim</string>
-    <string name="p5m_status_loading">Memuat soal dan score P5M…</string>
+    <string name="p5m_status_loading">Memuat status P5M...</string>
+    <string name="p5m_status_subtitle_loading">Sinkronisasi soal dan riwayat terbaru.</string>
     <string name="p5m_status_pending">P5M hari ini belum diisi. Jawab semua soal sebelum upload data.</string>
+    <string name="p5m_status_subtitle_pending">Lengkapi P5M aktif sebelum upload data.</string>
     <string name="p5m_status_already_submitted">P5M hari ini sudah diisi.</string>
     <string name="p5m_status_submitted">P5M hari ini sudah diisi. Score: %1$d</string>
-    <string name="p5m_status_submitted_hidden_active">Anda sudah mengisi p5m hari ini</string>
+    <string name="p5m_status_submitted_hidden_active">P5M hari ini sudah diisi</string>
+    <string name="p5m_status_subtitle_submitted">Data P5M sudah tersimpan dan aman untuk upload.</string>
+    <string name="p5m_status_subtitle_error">Periksa koneksi atau hubungi medic jika berulang.</string>
     <string name="p5m_quiz_completed_hint">Jawaban P5M hari ini sudah terkirim. Lihat score terbaru di bagian bawah.</string>
     <string name="p5m_source_today">Soal aktif hari ini. Tanggal referensi: %1$s</string>
     <string name="p5m_source_yesterday">Soal hari ini tidak ada. Memakai soal aktif kemarin. Tanggal referensi: %1$s</string>

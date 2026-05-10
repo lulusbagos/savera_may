@@ -48,7 +48,10 @@ public class MyP5M extends Fragment {
 
     private ProgressBar progress;
     private NestedScrollView p5mScroll;
+    private LinearLayout statusCard;
+    private TextView textStatusBadge;
     private TextView textStatus;
+    private TextView textStatusSubtitle;
     private TextView textQuizSource;
     private TextView textQuizTitle;
     private TextView textQuizContent;
@@ -76,7 +79,10 @@ public class MyP5M extends Fragment {
 
         progress = view.findViewById(R.id.progress);
         p5mScroll = view.findViewById(R.id.p5mScroll);
+        statusCard = view.findViewById(R.id.statusCard);
+        textStatusBadge = view.findViewById(R.id.textStatusBadge);
         textStatus = view.findViewById(R.id.textStatus);
+        textStatusSubtitle = view.findViewById(R.id.textStatusSubtitle);
         textQuizSource = view.findViewById(R.id.textQuizSource);
         textQuizTitle = view.findViewById(R.id.textQuizTitle);
         textQuizContent = view.findViewById(R.id.textQuizContent);
@@ -109,6 +115,7 @@ public class MyP5M extends Fragment {
 
         configureScrollBehavior();
         switchSection(true);
+        applyP5MStatusStyle(P5MStatusState.LOADING);
 
         bindLoadingState(true);
         fetchP5m();
@@ -154,7 +161,8 @@ public class MyP5M extends Fragment {
         textQuizEmpty.setText(getString(R.string.p5m_context_missing));
         textScoreEmpty.setVisibility(View.VISIBLE);
         textStatus.setText(getString(R.string.p5m_context_missing));
-        textStatus.setTextColor(Color.parseColor("#FFFFFF"));
+        textStatusSubtitle.setText(getString(R.string.p5m_status_subtitle_error));
+        applyP5MStatusStyle(P5MStatusState.ERROR);
         btnSubmit.setEnabled(false);
         btnSubmit.setVisibility(View.VISIBLE);
     }
@@ -242,18 +250,21 @@ public class MyP5M extends Fragment {
     private void bindStatus(boolean submittedToday, JSONObject todayScore) {
         if (submittedToday && todayScore != null) {
             textStatus.setText(getString(R.string.p5m_status_submitted_hidden_active));
-            textStatus.setTextColor(Color.parseColor("#FFFFFF"));
+            textStatusSubtitle.setText(getString(R.string.p5m_status_subtitle_submitted));
+            applyP5MStatusStyle(P5MStatusState.SUBMITTED);
             return;
         }
 
         if (submittedToday) {
             textStatus.setText(getString(R.string.p5m_status_submitted_hidden_active));
-            textStatus.setTextColor(Color.parseColor("#FFFFFF"));
+            textStatusSubtitle.setText(getString(R.string.p5m_status_subtitle_submitted));
+            applyP5MStatusStyle(P5MStatusState.SUBMITTED);
             return;
         }
 
         textStatus.setText(getString(R.string.p5m_status_pending));
-        textStatus.setTextColor(Color.parseColor("#FFFFFF"));
+        textStatusSubtitle.setText(getString(R.string.p5m_status_subtitle_pending));
+        applyP5MStatusStyle(P5MStatusState.PENDING);
     }
 
     private void bindQuiz(JSONObject quiz, JSONArray items) throws JSONException {
@@ -580,13 +591,19 @@ public class MyP5M extends Fragment {
 
     private void bindError(String message) {
         textStatus.setText(message);
-        textStatus.setTextColor(Color.parseColor("#FFFFFF"));
+        textStatusSubtitle.setText(getString(R.string.p5m_status_subtitle_error));
+        applyP5MStatusStyle(P5MStatusState.ERROR);
         toastMessage(message);
     }
 
     private void bindLoadingState(boolean loading) {
         progress.setVisibility(loading ? View.VISIBLE : View.GONE);
         p5mScroll.setAlpha(loading ? 0.55f : 1f);
+        if (loading) {
+            textStatus.setText(getString(R.string.p5m_status_loading));
+            textStatusSubtitle.setText(getString(R.string.p5m_status_subtitle_loading));
+            applyP5MStatusStyle(P5MStatusState.LOADING);
+        }
         btnSubmit.setEnabled(!loading && !alreadySubmitted && currentQuizId > 0);
     }
 
@@ -618,9 +635,47 @@ public class MyP5M extends Fragment {
     }
 
     private void applySectionVisibility() {
-        textStatus.setVisibility(showingActiveSection ? View.VISIBLE : View.GONE);
+        statusCard.setVisibility(showingActiveSection ? View.VISIBLE : View.GONE);
         cardQuiz.setVisibility(showingActiveSection && !alreadySubmitted ? View.VISIBLE : View.GONE);
         cardScores.setVisibility(showingActiveSection ? View.GONE : View.VISIBLE);
+    }
+
+    private void applyP5MStatusStyle(P5MStatusState state) {
+        switch (state) {
+            case SUBMITTED:
+                statusCard.setBackgroundResource(R.drawable.bg_p5m_status_success);
+                textStatusBadge.setBackgroundResource(R.drawable.bg_p5m_badge_success);
+                textStatusBadge.setText("OK");
+                textStatusBadge.setTextColor(Color.parseColor("#15803D"));
+                textStatus.setTextColor(Color.parseColor("#166534"));
+                textStatusSubtitle.setTextColor(Color.parseColor("#15803D"));
+                break;
+            case PENDING:
+                statusCard.setBackgroundResource(R.drawable.bg_p5m_status_pending);
+                textStatusBadge.setBackgroundResource(R.drawable.bg_p5m_badge_pending);
+                textStatusBadge.setText("!");
+                textStatusBadge.setTextColor(Color.parseColor("#C2410C"));
+                textStatus.setTextColor(Color.parseColor("#9A3412"));
+                textStatusSubtitle.setTextColor(Color.parseColor("#C2410C"));
+                break;
+            case ERROR:
+                statusCard.setBackgroundResource(R.drawable.bg_p5m_status_error);
+                textStatusBadge.setBackgroundResource(R.drawable.bg_p5m_badge_error);
+                textStatusBadge.setText("!");
+                textStatusBadge.setTextColor(Color.parseColor("#B91C1C"));
+                textStatus.setTextColor(Color.parseColor("#991B1B"));
+                textStatusSubtitle.setTextColor(Color.parseColor("#B91C1C"));
+                break;
+            case LOADING:
+            default:
+                statusCard.setBackgroundResource(R.drawable.bg_p5m_status_info);
+                textStatusBadge.setBackgroundResource(R.drawable.bg_p5m_badge_info);
+                textStatusBadge.setText("P5");
+                textStatusBadge.setTextColor(Color.parseColor("#1D4ED8"));
+                textStatus.setTextColor(Color.parseColor("#1E3A8A"));
+                textStatusSubtitle.setTextColor(Color.parseColor("#1D4ED8"));
+                break;
+        }
     }
 
     private String resolveQuizSourceText(JSONObject quiz) {
@@ -672,5 +727,12 @@ public class MyP5M extends Fragment {
 
     private int dp(int value) {
         return Math.round(value * requireContext().getResources().getDisplayMetrics().density);
+    }
+
+    private enum P5MStatusState {
+        LOADING,
+        SUBMITTED,
+        PENDING,
+        ERROR
     }
 }
