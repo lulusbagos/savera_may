@@ -350,40 +350,42 @@ public class MyDashboard extends Fragment {
         btnFit2Tdk = view.findViewById(R.id.btnFit2Tdk);
         btnFit3Tdk = view.findViewById(R.id.btnFit3Tdk);
 
-        int colorDefault = getResources().getColor(R.color.chart_stress_relaxed);
-        btnFit1Ya.setBackgroundColor(colorDefault); btnFit1Tdk.setBackgroundColor(colorDefault);
-        btnFit2Ya.setBackgroundColor(colorDefault); btnFit2Tdk.setBackgroundColor(colorDefault);
-        btnFit3Ya.setBackgroundColor(colorDefault); btnFit3Tdk.setBackgroundColor(colorDefault);
-
-        isFit1 = -1; isFit2 = -1; isFit3 = -1;
+        restoreFitToWorkStateForToday();
+        applyFitToWorkButtonState();
 
         btnFit1Ya.setOnClickListener(v -> {
             isFit1 = 1; localStorage.setFit1(1);
+            persistFitToWorkStateIfComplete();
             btnFit1Ya.setBackgroundColor(getResources().getColor(R.color.chart_deep_sleep_light));
             btnFit1Tdk.setBackgroundColor(getResources().getColor(R.color.chart_stress_relaxed));
         });
         btnFit2Ya.setOnClickListener(v -> {
             isFit2 = 1; localStorage.setFit2(1);
+            persistFitToWorkStateIfComplete();
             btnFit2Ya.setBackgroundColor(getResources().getColor(R.color.chart_deep_sleep_light));
             btnFit2Tdk.setBackgroundColor(getResources().getColor(R.color.chart_stress_relaxed));
         });
         btnFit3Ya.setOnClickListener(v -> {
             isFit3 = 1; localStorage.setFit3(1);
+            persistFitToWorkStateIfComplete();
             btnFit3Ya.setBackgroundColor(getResources().getColor(R.color.chart_deep_sleep_light));
             btnFit3Tdk.setBackgroundColor(getResources().getColor(R.color.chart_stress_relaxed));
         });
         btnFit1Tdk.setOnClickListener(v -> {
             isFit1 = 0; localStorage.setFit1(0);
+            persistFitToWorkStateIfComplete();
             btnFit1Ya.setBackgroundColor(getResources().getColor(R.color.chart_stress_relaxed));
             btnFit1Tdk.setBackgroundColor(getResources().getColor(R.color.chart_deep_sleep_light));
         });
         btnFit2Tdk.setOnClickListener(v -> {
             isFit2 = 0; localStorage.setFit2(0);
+            persistFitToWorkStateIfComplete();
             btnFit2Ya.setBackgroundColor(getResources().getColor(R.color.chart_stress_relaxed));
             btnFit2Tdk.setBackgroundColor(getResources().getColor(R.color.chart_deep_sleep_light));
         });
         btnFit3Tdk.setOnClickListener(v -> {
             isFit3 = 0; localStorage.setFit3(0);
+            persistFitToWorkStateIfComplete();
             btnFit3Ya.setBackgroundColor(getResources().getColor(R.color.chart_stress_relaxed));
             btnFit3Tdk.setBackgroundColor(getResources().getColor(R.color.chart_deep_sleep_light));
         });
@@ -1492,6 +1494,10 @@ public class MyDashboard extends Fragment {
         if (context == null) {
             return;
         }
+        if (hasFitToWorkBeenSentToday()) {
+            LOG.info("Fit-to-work already sent today, skipping duplicate POST");
+            return;
+        }
 
         String url = getString(R.string.base_url) + "/mobile/fit-to-work";
         JSONObject params = new JSONObject();
@@ -1532,11 +1538,89 @@ public class MyDashboard extends Fragment {
                 Integer code = http.getStatusCode();
                 if (code == null || (code != 200 && code != 201)) {
                     LOG.warn("Fit-to-work POST failed with code: {}", code);
+                } else if (localStorage != null) {
+                    localStorage.setFitToWorkSentDate(todayStorageKey());
                 }
             } catch (Exception e) {
                 LOG.warn("Fit-to-work POST error", e);
             }
         }).start();
+    }
+
+    private void restoreFitToWorkStateForToday() {
+        isFit1 = -1;
+        isFit2 = -1;
+        isFit3 = -1;
+        if (localStorage == null) {
+            return;
+        }
+
+        int storedFit1 = localStorage.getFit1();
+        int storedFit2 = localStorage.getFit2();
+        int storedFit3 = localStorage.getFit3();
+        if (!isValidFitAnswer(storedFit1) || !isValidFitAnswer(storedFit2) || !isValidFitAnswer(storedFit3)) {
+            return;
+        }
+
+        String today = todayStorageKey();
+        String storedDate = localStorage.getFitToWorkDate();
+        if (today.equals(storedDate)) {
+            isFit1 = storedFit1;
+            isFit2 = storedFit2;
+            isFit3 = storedFit3;
+            return;
+        }
+
+        if (storedDate == null || storedDate.isBlank()) {
+            isFit1 = storedFit1;
+            isFit2 = storedFit2;
+            isFit3 = storedFit3;
+            localStorage.setFitToWorkDate(today);
+        }
+    }
+
+    private void applyFitToWorkButtonState() {
+        int colorDefault = getResources().getColor(R.color.chart_stress_relaxed);
+        int colorSelected = getResources().getColor(R.color.chart_deep_sleep_light);
+
+        btnFit1Ya.setBackgroundColor(isFit1 == 1 ? colorSelected : colorDefault);
+        btnFit1Tdk.setBackgroundColor(isFit1 == 0 ? colorSelected : colorDefault);
+        btnFit2Ya.setBackgroundColor(isFit2 == 1 ? colorSelected : colorDefault);
+        btnFit2Tdk.setBackgroundColor(isFit2 == 0 ? colorSelected : colorDefault);
+        btnFit3Ya.setBackgroundColor(isFit3 == 1 ? colorSelected : colorDefault);
+        btnFit3Tdk.setBackgroundColor(isFit3 == 0 ? colorSelected : colorDefault);
+    }
+
+    private void persistFitToWorkStateIfComplete() {
+        if (localStorage == null || !isFitToWorkComplete()) {
+            return;
+        }
+        localStorage.setFitToWorkDate(todayStorageKey());
+    }
+
+    private boolean restoreAndCheckFitToWorkForToday() {
+        if (isFitToWorkComplete() && todayStorageKey().equals(localStorage.getFitToWorkDate())) {
+            return true;
+        }
+        restoreFitToWorkStateForToday();
+        applyFitToWorkButtonState();
+        return isFitToWorkComplete() && todayStorageKey().equals(localStorage.getFitToWorkDate());
+    }
+
+    private boolean isFitToWorkComplete() {
+        return isValidFitAnswer(isFit1) && isValidFitAnswer(isFit2) && isValidFitAnswer(isFit3);
+    }
+
+    private boolean isValidFitAnswer(int value) {
+        return value == 0 || value == 1;
+    }
+
+    private boolean hasFitToWorkBeenSentToday() {
+        return localStorage != null && todayStorageKey().equals(localStorage.getFitToWorkSentDate());
+    }
+
+    private String todayStorageKey() {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
     }
 
     private void sendSummary(View view) {
@@ -1618,9 +1702,9 @@ public class MyDashboard extends Fragment {
         }
         
         // Validate fit to work (skip only for developer mode as it's auto-set)
-        if (!isDeveloperMode() && (isFit1 < 0 || isFit2 < 0 || isFit3 < 0)) {
+        if (!isDeveloperMode() && !restoreAndCheckFitToWorkForToday()) {
             showUploadProgressOverlay(false);
-            toast(requireActivity(), "Fit to work harus diisi!", Toast.LENGTH_SHORT, GB.ERROR);
+            toast(requireActivity(), "Fit to Work hari ini belum lengkap. Isi sekali saja sebelum upload.", Toast.LENGTH_SHORT, GB.ERROR);
             return;
         }
         

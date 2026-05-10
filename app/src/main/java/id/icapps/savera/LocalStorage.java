@@ -30,6 +30,8 @@ public class LocalStorage {
     private static final String KEY_FIT_3 = "FIT_3";
     private static final String KEY_FIT_4 = "FIT_4";
     private static final String KEY_FIT_5 = "FIT_5";
+    private static final String KEY_FIT_TO_WORK_DATE = "FIT_TO_WORK_DATE";
+    private static final String KEY_FIT_TO_WORK_SENT_DATE = "FIT_TO_WORK_SENT_DATE";
     private static final String KEY_LAST_SLEEP_SNAPSHOT = "LAST_SLEEP_SNAPSHOT";
     private static final String KEY_NOTIFICATION_CACHE = "NOTIFICATION_CACHE";
     private static final String KEY_NOTIFICATION_CACHE_SYNCED_AT = "NOTIFICATION_CACHE_SYNCED_AT";
@@ -217,6 +219,24 @@ public class LocalStorage {
 
     public void setFit5(int value) {
         editor.putInt(KEY_FIT_5, value);
+        editor.commit();
+    }
+
+    public String getFitToWorkDate() {
+        return sharedPreferences.getString(KEY_FIT_TO_WORK_DATE, "");
+    }
+
+    public void setFitToWorkDate(String value) {
+        editor.putString(KEY_FIT_TO_WORK_DATE, value == null ? "" : value);
+        editor.commit();
+    }
+
+    public String getFitToWorkSentDate() {
+        return sharedPreferences.getString(KEY_FIT_TO_WORK_SENT_DATE, "");
+    }
+
+    public void setFitToWorkSentDate(String value) {
+        editor.putString(KEY_FIT_TO_WORK_SENT_DATE, value == null ? "" : value);
         editor.commit();
     }
 
