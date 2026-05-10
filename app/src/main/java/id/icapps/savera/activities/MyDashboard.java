@@ -13,6 +13,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.net.Uri;
 import android.net.NetworkCapabilities;
 import android.os.Build;
@@ -137,13 +138,14 @@ public class MyDashboard extends Fragment {
     private static final long PENDING_UPLOAD_GAP_MS_PUBLIC = 1200L;
     private static final Logger LOG = LoggerFactory.getLogger(MyDashboard.class);
     private static Calendar now = GregorianCalendar.getInstance();
-    private TextView textNama, textNik, textDepartemen, textMess, textInfo, textSteps, textDistance, textActive, textSleep, textSleepType, textHeartRate, textCalories, textMoving, textStanding, textBloodOxygen, textBloodPressure, textStress, textPAI, textWeight, textVOMax;
+    private TextView textNama, textNik, textDepartemen, textMess, textInfo, textInfoSubtitle, textSteps, textDistance, textActive, textSleep, textSleepType, textHeartRate, textCalories, textMoving, textStanding, textBloodOxygen, textBloodPressure, textStress, textPAI, textWeight, textVOMax;
     private TextView textDate, textOperator, textDevice, textTime, textToday, textYesterday, textRest, arrowLeft, arrowRight;
     private TextView textNotificationBadge;
     private Button btnFit1Ya, btnFit2Ya, btnFit3Ya,
                      btnFit1Tdk, btnFit2Tdk, btnFit3Tdk;
     private ImageView imageProfile, imageProfile_;
     private View serverStatusIndicator;
+    private LinearLayout sleepStatusCard;
     private ImageButton btnSync, btnReload, btnP5m, btnZona, btnNotification;
     private String employeePhoto;
     private int employeeId, userId, companyId, departmentId, shiftId, deviceId;
@@ -255,6 +257,8 @@ public class MyDashboard extends Fragment {
         textDepartemen = view.findViewById(R.id.textDepartemen);
         textMess = view.findViewById(R.id.textMess);
         textInfo = view.findViewById(R.id.textInfo);
+        textInfoSubtitle = view.findViewById(R.id.textInfoSubtitle);
+        sleepStatusCard = view.findViewById(R.id.sleepStatusCard);
         textSteps = view.findViewById(R.id.textSteps);
         textDistance = view.findViewById(R.id.textDistance);
         textActive = view.findViewById(R.id.textActive);
@@ -769,6 +773,7 @@ public class MyDashboard extends Fragment {
         int sleepStatusColor = getSleepStatusColor(totalSleepMinutes);
         textInfo.setText(getSleepStatusLabel(totalSleepMinutes));
         textInfo.setTextColor(sleepStatusColor);
+        applySleepStatusCardStyle(totalSleepMinutes);
         loadingSleep.setIndicatorColor(sleepStatusColor);
 
         final String tsFrom = new SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()).format(new Date(myData1.sleepFrom * 1000L));
@@ -833,6 +838,33 @@ public class MyDashboard extends Fragment {
             return getResources().getColor(R.color.hrv_status_unbalanced);
         }
         return getResources().getColor(R.color.hrv_status_balanced);
+    }
+
+    private void applySleepStatusCardStyle(long effectiveSleepMinutes) {
+        if (sleepStatusCard == null) {
+            return;
+        }
+
+        if (effectiveSleepMinutes < 270) {
+            sleepStatusCard.setBackgroundResource(R.drawable.bg_sleep_status_red);
+            if (textInfoSubtitle != null) {
+                textInfoSubtitle.setTextColor(Color.parseColor("#7F1D1D"));
+            }
+            return;
+        }
+
+        if (effectiveSleepMinutes < 330) {
+            sleepStatusCard.setBackgroundResource(R.drawable.bg_sleep_status_yellow);
+            if (textInfoSubtitle != null) {
+                textInfoSubtitle.setTextColor(Color.parseColor("#92400E"));
+            }
+            return;
+        }
+
+        sleepStatusCard.setBackgroundResource(R.drawable.bg_sleep_status_green);
+        if (textInfoSubtitle != null) {
+            textInfoSubtitle.setTextColor(Color.parseColor("#166534"));
+        }
     }
 
     @SuppressLint("SetTextI18n")
