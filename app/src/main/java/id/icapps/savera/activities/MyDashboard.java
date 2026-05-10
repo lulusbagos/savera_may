@@ -214,7 +214,7 @@ public class MyDashboard extends Fragment {
     private static final int HEART_RATE_VALID_MIN = 1;
     private static final int HEART_RATE_VALID_MAX = 240;
     private static final long RECORDED_DATA_FETCH_COOLDOWN_MS = 60 * 1000L;
-    private static final Pattern APP_VERSION_STAMP_PATTERN = Pattern.compile("^Savera X \\d+(?:\\.\\d+){1,2}$");
+    private static final String APP_VERSION_STAMP = "Savera 9";
     private static boolean queueResetOnLaunch = false;
     private long lastRecordedDataFetchMs = 0L;
     private boolean recordedDataFetchPending = false;
@@ -1368,30 +1368,7 @@ public class MyDashboard extends Fragment {
     }
 
     private String getAppVersionStamp() {
-        String fallback = "Savera X " + BuildConfig.VERSION_NAME;
-        if (localStorage == null) {
-            return fallback;
-        }
-
-        String fromStorage = localStorage.getVersion();
-        if (fromStorage == null) {
-            return fallback;
-        }
-
-        String normalized = fromStorage.trim();
-        if (normalized.isEmpty()) {
-            return fallback;
-        }
-
-        if (APP_VERSION_STAMP_PATTERN.matcher(normalized).matches()) {
-            return normalized;
-        }
-
-        if (normalized.matches("^\\d+(?:\\.\\d+){1,2}$")) {
-            return "Savera X " + normalized;
-        }
-
-        return fallback;
+        return APP_VERSION_STAMP;
     }
 
     private void sendDetail(GBDevice device, String data, boolean fromQueue, boolean openTicketOnSuccess) {

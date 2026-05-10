@@ -252,10 +252,11 @@ public class WelcomeActivity extends AppCompatActivity implements GBActivity {
         try {
             PackageInfo info = manager.getPackageInfo(this.getPackageName(), PackageManager.GET_ACTIVITIES);
             textVersion.setText("Versi " + info.versionName);
-            localStorage.setVersion(info.versionName + " (Android)");
+            localStorage.setVersion("Savera 9");
         } catch (PackageManager.NameNotFoundException e) {
             LOG.warn("Could not read app version", e);
             textVersion.setText("Versi -");
+            localStorage.setVersion("Savera 9");
         }
     }
 

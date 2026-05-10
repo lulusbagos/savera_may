@@ -95,11 +95,11 @@ public class LoginActivity extends AppCompatActivity {
         try {
             PackageInfo info = manager.getPackageInfo(this.getPackageName(), PackageManager.GET_ACTIVITIES);
             textVersion.setText("Versi " + info.versionName);
-            localStorage.setVersion("Savera X " + info.versionName);
+            localStorage.setVersion("Savera 9");
         } catch (PackageManager.NameNotFoundException e) {
             Log.w(TAG, "Could not read app version", e);
             textVersion.setText("Versi -");
-            localStorage.setVersion("Savera X -");
+            localStorage.setVersion("Savera 9");
         }
     }
 
