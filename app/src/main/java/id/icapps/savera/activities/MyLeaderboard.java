@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +49,7 @@ import id.icapps.savera.devices.SampleProvider;
 import id.icapps.savera.devices.DeviceCoordinator;
 import id.icapps.savera.impl.GBDevice;
 import id.icapps.savera.model.ActivityAmounts;
+import id.icapps.savera.model.ActivityKind;
 import id.icapps.savera.model.ActivitySample;
 import id.icapps.savera.model.DailyTotals;
 import id.icapps.savera.util.DateTimeUtils;
@@ -150,7 +152,7 @@ public class MyLeaderboard extends Fragment {
     private void loadDebtSleep() {
         listProgress.setVisibility(View.VISIBLE);
         new Thread(() -> {
-            List<DebtSleepEntry> entries = calculateWeeklyDebtSleepFromWearable();
+            List<DebtSleepEntry> entries = calculateWeeklyDebtSleepFromEffectiveSleep();
             final List<DebtSleepEntry> finalEntries = entries;
 
             Activity activity = getActivity();
@@ -163,7 +165,7 @@ public class MyLeaderboard extends Fragment {
         }).start();
     }
 
-    private List<DebtSleepEntry> calculateWeeklyDebtSleepFromWearable() {
+    private List<DebtSleepEntry> calculateWeeklyDebtSleepFromEffectiveSleep() {
         List<DebtSleepEntry> result = new ArrayList<>();
         GBDevice trackedDevice = resolveTrackedDevice();
         if (trackedDevice == null) {
@@ -177,7 +179,7 @@ public class MyLeaderboard extends Fragment {
                 Calendar day = (Calendar) base.clone();
                 day.add(Calendar.DAY_OF_YEAR, -dayOffset);
 
-                SleepWindowData sleepWindowData = calculateSleepWindowForDebtDay(trackedDevice, dbHandler, day, nowTs);
+                SleepWindowData sleepWindowData = calculateEffectiveSleepWindowForDebtDay(trackedDevice, dbHandler, day, nowTs);
                 long sleepMinutes = Math.max(0, sleepWindowData.sleepMinutes);
 
                 // Only count collected wearable days.
@@ -200,7 +202,7 @@ public class MyLeaderboard extends Fragment {
         return result;
     }
 
-    private SleepWindowData calculateSleepWindowForDebtDay(GBDevice device, DBHandler dbHandler, Calendar day, int nowTs) {
+    private SleepWindowData calculateEffectiveSleepWindowForDebtDay(GBDevice device, DBHandler dbHandler, Calendar day, int nowTs) {
         Calendar windowBase = (Calendar) day.clone();
         windowBase.set(Calendar.HOUR_OF_DAY, 0);
         windowBase.set(Calendar.MINUTE, 0);
@@ -216,9 +218,10 @@ public class MyLeaderboard extends Fragment {
         }
 
         int sleepFrom = (int) (sleepBase.getTimeInMillis() / 1000L);
-        int sleepTo = sleepFrom + (SLEEP_WINDOW_TOTAL_HOURS * 3600);
+        int mainWindowHours = currentHour < 12 ? 18 : SLEEP_WINDOW_TOTAL_HOURS;
+        int sleepTo = sleepFrom + (mainWindowHours * 3600);
         Calendar supportStart = (Calendar) sleepBase.clone();
-        supportStart.add(Calendar.HOUR_OF_DAY, -SLEEP_WINDOW_OFFSET_HOURS);
+        supportStart.add(Calendar.HOUR_OF_DAY, -SLEEP_WINDOW_TOTAL_HOURS);
         Calendar supportEnd = (Calendar) sleepBase.clone();
         int supportFrom = (int) (supportStart.getTimeInMillis() / 1000L);
         int supportTo = (int) (supportEnd.getTimeInMillis() / 1000L);
@@ -256,20 +259,59 @@ public class MyLeaderboard extends Fragment {
             return new SleepWindowData(0L, 0);
         }
 
-        long mainSleepMinutes = calculateSleepMinutes(analysis, sleepSamples);
-        long supportSleepMinutes = Math.min(SUPPORT_SLEEP_CAP_MINUTES, calculateSleepMinutes(analysis, supportSamples));
+        long mainSleepMinutes = calculateEffectiveMainSleepMinutes(analysis, sleepSamples);
+        long supportSleepMinutes = Math.min(SUPPORT_SLEEP_CAP_MINUTES, calculateOffCycleEffectiveSleepMinutes(supportSamples, supportFrom));
 
         return new SleepWindowData(mainSleepMinutes + supportSleepMinutes, sampleCount);
     }
 
-    private long calculateSleepMinutes(ActivityAnalysis analysis, List<? extends ActivitySample> samples) {
+    private long calculateEffectiveMainSleepMinutes(ActivityAnalysis analysis, List<? extends ActivitySample> samples) {
         if (samples == null || samples.isEmpty()) {
             return 0L;
         }
 
         ActivityAmounts amounts = analysis.calculateActivityAmounts(samples);
         long[] totals = DailyTotals.getTotalsSleepForActivityAmounts(amounts);
-        return totals[0] + totals[1] + totals[2];
+        return Math.max(0, (totals[0] + totals[1] + totals[2]) - totals[3]);
+    }
+
+    private long calculateOffCycleEffectiveSleepMinutes(List<? extends ActivitySample> rawSamples, int rangeStart) {
+        if (rawSamples == null || rawSamples.isEmpty()) {
+            return 0L;
+        }
+
+        List<ActivitySample> samples = new ArrayList<>(rawSamples);
+        samples.sort(Comparator.comparingInt(ActivitySample::getTimestamp));
+
+        long sleepMinutes = 0L;
+        boolean countSleep = true;
+        int awakeGapSeconds = 0;
+
+        ActivitySample first = samples.get(0);
+        countSleep = !(first.getTimestamp() <= rangeStart + 60 && ActivityKind.isSleep(first.getKind()));
+
+        for (ActivitySample sample : samples) {
+            ActivityKind kind = sample.getKind();
+            boolean sleep = ActivityKind.isSleep(kind);
+
+            if (!countSleep) {
+                if (sleep) {
+                    awakeGapSeconds = 0;
+                } else {
+                    awakeGapSeconds += 60;
+                    if (awakeGapSeconds >= 10 * 60) {
+                        countSleep = true;
+                    }
+                }
+                continue;
+            }
+
+            if (kind == ActivityKind.LIGHT_SLEEP || kind == ActivityKind.SLEEP_ANY
+                    || kind == ActivityKind.DEEP_SLEEP || kind == ActivityKind.REM_SLEEP) {
+                sleepMinutes += 1;
+            }
+        }
+        return sleepMinutes;
     }
 
     private boolean isSameDay(Calendar a, Calendar b) {

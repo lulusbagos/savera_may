@@ -95,11 +95,11 @@ public class LoginActivity extends AppCompatActivity {
         try {
             PackageInfo info = manager.getPackageInfo(this.getPackageName(), PackageManager.GET_ACTIVITIES);
             textVersion.setText("Versi " + info.versionName);
-            localStorage.setVersion("Savera 9");
+            localStorage.setVersion("Savera X");
         } catch (PackageManager.NameNotFoundException e) {
             Log.w(TAG, "Could not read app version", e);
             textVersion.setText("Versi -");
-            localStorage.setVersion("Savera 9");
+            localStorage.setVersion("Savera X");
         }
     }
 
@@ -258,7 +258,7 @@ public class LoginActivity extends AppCompatActivity {
                         Log.d(TAG, "Login response code: " + code);
                         
                         if (code == null || code == 0) {
-                            toast(LoginActivity.this, "Server tidak merespons. Periksa koneksi internet lalu coba lagi.", Toast.LENGTH_LONG, GB.ERROR);
+                            toast(LoginActivity.this, http.getErrorMessage(), Toast.LENGTH_LONG, GB.ERROR);
                             return;
                         }
 
@@ -317,7 +317,7 @@ public class LoginActivity extends AppCompatActivity {
                             applyLoginFieldError(code, msg);
                             toast(LoginActivity.this, userMessage, Toast.LENGTH_LONG, GB.ERROR);
                         } else {
-                            toast(LoginActivity.this, "Login belum berhasil. Server mengembalikan HTTP " + code + ".", Toast.LENGTH_SHORT, GB.ERROR);
+                            toast(LoginActivity.this, http.getErrorMessage("Login belum berhasil. Silakan coba lagi."), Toast.LENGTH_LONG, GB.ERROR);
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error processing login response", e);
@@ -330,7 +330,7 @@ public class LoginActivity extends AppCompatActivity {
                     if (progressDialog != null && progressDialog.isShowing()) {
                         progressDialog.dismiss();
                     }
-                    toast(LoginActivity.this, "Koneksi ke server gagal. Periksa internet lalu coba lagi.", Toast.LENGTH_LONG, GB.ERROR);
+                    toast(LoginActivity.this, Http.SERVER_DOWN_MESSAGE, Toast.LENGTH_LONG, GB.ERROR);
                 });
             }
         }).start();
@@ -374,7 +374,7 @@ public class LoginActivity extends AppCompatActivity {
                         Log.d(TAG, "Profile response code: " + code);
                         
                         if (code == null || code == 0) {
-                            toast(LoginActivity.this, "No response from server. Check your internet connection.", Toast.LENGTH_LONG, GB.ERROR);
+                            toast(LoginActivity.this, http.getErrorMessage(), Toast.LENGTH_LONG, GB.ERROR);
                             return;
                         }
 
@@ -435,11 +435,11 @@ public class LoginActivity extends AppCompatActivity {
                                 toast(LoginActivity.this, "Failed to get profile (Error " + code + ")", Toast.LENGTH_SHORT, GB.ERROR);
                             }
                         } else {
-                            toast(LoginActivity.this, "Error get user profile (HTTP " + code + ")", Toast.LENGTH_SHORT, GB.ERROR);
+                            toast(LoginActivity.this, http.getErrorMessage("Gagal mengambil profile user."), Toast.LENGTH_LONG, GB.ERROR);
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error processing profile response", e);
-                        toast(LoginActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT, GB.ERROR);
+                        toast(LoginActivity.this, "Gagal memproses data profile. Silakan coba login kembali.", Toast.LENGTH_LONG, GB.ERROR);
                     }
                 });
             } catch (Exception e) {
@@ -448,7 +448,7 @@ public class LoginActivity extends AppCompatActivity {
                     if (progressDialog != null && progressDialog.isShowing()) {
                         progressDialog.dismiss();
                     }
-                    toast(LoginActivity.this, "Network error: " + e.getMessage(), Toast.LENGTH_LONG, GB.ERROR);
+                    toast(LoginActivity.this, Http.SERVER_DOWN_MESSAGE, Toast.LENGTH_LONG, GB.ERROR);
                 });
             }
         }).start();

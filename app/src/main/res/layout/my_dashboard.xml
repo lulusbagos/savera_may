@@ -362,7 +362,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/_1sdp"
                             android:textSize="@dimen/_8sdp"
-                            android:text="termasuk awake"
+                            android:text="sesuai jam"
                             android:textColor="#EDE9FE"
                             android:textAlignment="center"
                             tools:ignore="HardcodedText" />

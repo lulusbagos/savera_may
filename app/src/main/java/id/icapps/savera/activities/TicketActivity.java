@@ -269,13 +269,13 @@ public class TicketActivity extends AppCompatActivity {
                     try {
                         JSONObject response = new JSONObject(http.getResponse());
                         String msg = response.optString("message", "Gagal memuat data ticket.");
-                        toast(TicketActivity.this, msg, Toast.LENGTH_SHORT, GB.ERROR);
+                        toast(TicketActivity.this, msg, Toast.LENGTH_LONG, GB.ERROR);
                     } catch (JSONException e) {
                         LOG.warn("Failed parsing ticket error response", e);
-                        toast(TicketActivity.this, "Gagal memuat data ticket.", Toast.LENGTH_SHORT, GB.ERROR);
+                        toast(TicketActivity.this, http.getErrorMessage("Gagal memuat data ticket."), Toast.LENGTH_LONG, GB.ERROR);
                     }
                 } else {
-                    toast(TicketActivity.this, "Error get user ticket", Toast.LENGTH_SHORT, GB.ERROR);
+                    toast(TicketActivity.this, http.getErrorMessage("Gagal memuat data ticket."), Toast.LENGTH_LONG, GB.ERROR);
                 }
             });
         }).start();

@@ -11,8 +11,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.ConnectException;
 import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -25,6 +28,7 @@ import id.icapps.savera.util.ApiEndpointResolver;
 import id.icapps.savera.util.ApiUrl;
 
 public class Http {
+    public static final String SERVER_DOWN_MESSAGE = "Server down silahkan hubungi SDIT PT UNGGUL DINAMIKA UTAMA";
     private static final int CONNECT_TIMEOUT_MS = 15000;
     private static final int READ_TIMEOUT_MS = 30000;
     private static final int MAX_ATTEMPTS = 3;
@@ -36,6 +40,7 @@ public class Http {
     Context context;
     private String url, method = "GET", data = null, response = null;
     private Integer statusCode = 0;
+    private String errorMessage = null;
     private Boolean token = false;
     private boolean bypassCache = false;
     private int cacheTtlSeconds = 0;
@@ -124,9 +129,53 @@ public class Http {
         return this.statusCode;
     }
 
+    public String getErrorMessage() {
+        return getErrorMessage("Terjadi kesalahan koneksi. Silakan coba lagi.");
+    }
+
+    public String getErrorMessage(String fallback) {
+        if (isServerDown()) {
+            return SERVER_DOWN_MESSAGE;
+        }
+        if (this.errorMessage != null && !this.errorMessage.trim().isEmpty()) {
+            return this.errorMessage.trim();
+        }
+        if (this.statusCode != null && this.statusCode == 408) {
+            return "Koneksi ke server timeout. Silakan coba lagi.";
+        }
+        if (this.statusCode != null && this.statusCode == 401) {
+            return "Sesi login berakhir. Silakan login kembali.";
+        }
+        if (this.statusCode != null && this.statusCode == 403) {
+            return "Akses ditolak oleh server. Silakan hubungi admin.";
+        }
+        if (this.statusCode != null && this.statusCode == 404) {
+            return "Data tidak ditemukan di server.";
+        }
+        if (this.statusCode != null && this.statusCode == 422) {
+            return "Data belum valid. Periksa kembali isian.";
+        }
+        if (this.statusCode != null && this.statusCode > 0) {
+            return "Request gagal. Server mengembalikan HTTP " + this.statusCode + ".";
+        }
+        return fallback == null || fallback.trim().isEmpty()
+                ? "Terjadi kesalahan koneksi. Silakan coba lagi."
+                : fallback.trim();
+    }
+
+    public boolean isServerDown() {
+        return this.statusCode == null
+                || this.statusCode == 0
+                || this.statusCode == 500
+                || this.statusCode == 502
+                || this.statusCode == 503
+                || this.statusCode == 504;
+    }
+
     public void send() {
         this.response = null;
         this.statusCode = 0;
+        this.errorMessage = null;
 
         IOException lastException = null;
         RuntimeException lastRuntimeException = null;
@@ -235,6 +284,7 @@ public class Http {
                         }
                     } catch (IOException e) {
                         lastException = e;
+                        this.errorMessage = buildConnectionErrorMessage(e);
                         String candidateBaseUrl = ApiEndpointResolver.apiBaseUrl(candidateUrl);
                         boolean localCandidateFailed = !configuredLocalBaseUrl.isEmpty()
                                 && configuredLocalBaseUrl.equalsIgnoreCase(candidateBaseUrl);
@@ -248,6 +298,7 @@ public class Http {
                         }
                     } catch (RuntimeException e) {
                         lastRuntimeException = e;
+                        this.errorMessage = "Terjadi kesalahan saat menghubungi server. Silakan coba lagi.";
                         if (BuildConfig.DEBUG) {
                             Log.w("HttpURL", "Runtime error for URL " + candidateUrl + ": " + e.getMessage());
                         }
@@ -277,6 +328,7 @@ public class Http {
                 }
             }
         } catch (MalformedURLException e) {
+            this.errorMessage = "Alamat server tidak valid. Silakan hubungi admin aplikasi.";
             e.printStackTrace();
             return;
         }
@@ -287,6 +339,27 @@ public class Http {
         if (lastRuntimeException != null) {
             lastRuntimeException.printStackTrace();
         }
+    }
+
+    private String buildConnectionErrorMessage(IOException e) {
+        if (e instanceof UnknownHostException || e instanceof ConnectException || e instanceof SocketTimeoutException) {
+            return SERVER_DOWN_MESSAGE;
+        }
+
+        String message = e.getMessage();
+        if (message != null) {
+            String normalized = message.toLowerCase(Locale.ROOT);
+            if (normalized.contains("failed to connect")
+                    || normalized.contains("connection refused")
+                    || normalized.contains("timed out")
+                    || normalized.contains("unable to resolve host")
+                    || normalized.contains("network is unreachable")
+                    || normalized.contains("connection reset")) {
+                return SERVER_DOWN_MESSAGE;
+            }
+        }
+
+        return "Koneksi ke server gagal. Periksa jaringan lalu coba lagi.";
     }
 
     private boolean loadCachedResponse() {

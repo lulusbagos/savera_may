@@ -64,6 +64,9 @@ import id.icapps.savera.util.Prefs;
 //TODO: extend AbstractGBActivity, but it requires actionbar that is not available
 public class WelcomeActivity extends AppCompatActivity implements GBActivity {
     private static final Logger LOG = LoggerFactory.getLogger(WelcomeActivity.class);
+    private static final String OTHER_SAVERA_PACKAGE = "id.icapps.savera.x";
+    private static final String OTHER_SAVERA_NAME = "Savera X";
+    private static final String COEXISTING_INFO_PREF = "coexisting_savera_info_shown";
     public static final String ACTION_REQUEST_PERMISSIONS
             = "id.icapps.savera.activities.controlcenter.requestpermissions";
     public static final String ACTION_REQUEST_LOCATION_PERMISSIONS
@@ -252,11 +255,47 @@ public class WelcomeActivity extends AppCompatActivity implements GBActivity {
         try {
             PackageInfo info = manager.getPackageInfo(this.getPackageName(), PackageManager.GET_ACTIVITIES);
             textVersion.setText("Versi " + info.versionName);
-            localStorage.setVersion("Savera 9");
+            localStorage.setVersion("Savera X");
         } catch (PackageManager.NameNotFoundException e) {
             LOG.warn("Could not read app version", e);
             textVersion.setText("Versi -");
-            localStorage.setVersion("Savera 9");
+            localStorage.setVersion("Savera X");
+        }
+
+        showCoexistingSaveraInfoIfNeeded();
+    }
+
+    private void showCoexistingSaveraInfoIfNeeded() {
+        Prefs prefs = GBApplication.getPrefs();
+        String prefKey = COEXISTING_INFO_PREF + "_" + OTHER_SAVERA_PACKAGE;
+        if (prefs.getBoolean(prefKey, false) || !isPackageInstalled(OTHER_SAVERA_PACKAGE)) {
+            return;
+        }
+
+        prefs.getPreferences().edit().putBoolean(prefKey, true).apply();
+        getWindow().getDecorView().post(() -> {
+            if (isFinishing() || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed())) {
+                return;
+            }
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle(getString(R.string.coexisting_savera_title, OTHER_SAVERA_NAME))
+                    .setMessage(getString(R.string.coexisting_savera_message, OTHER_SAVERA_NAME, getString(R.string.application_name_generic)))
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+        });
+    }
+
+    private boolean isPackageInstalled(String packageName) {
+        try {
+            PackageManager manager = getPackageManager();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                manager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0));
+            } else {
+                manager.getPackageInfo(packageName, 0);
+            }
+            return true;
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return false;
         }
     }
 

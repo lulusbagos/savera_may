@@ -558,12 +558,22 @@ public class MyP5M extends Fragment {
     }
 
     private void bindHttpError(Http http, int fallbackResId) {
+        if (http == null) {
+            bindError(getString(fallbackResId));
+            return;
+        }
+
+        if (http.isServerDown()) {
+            bindError(http.getErrorMessage());
+            return;
+        }
+
         try {
             JSONObject response = new JSONObject(Objects.requireNonNullElse(http.getResponse(), "{}"));
             String message = normalizeBackendMessage(response, fallbackResId);
             bindError(message);
         } catch (JSONException e) {
-            bindError(getString(fallbackResId));
+            bindError(http.getErrorMessage(getString(fallbackResId)));
         }
     }
 

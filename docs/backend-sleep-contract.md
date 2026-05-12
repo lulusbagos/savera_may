@@ -8,7 +8,7 @@ Dokumen ini menjadi acuan agar perhitungan di aplikasi mobile dan web/backend ko
 - Tidur efektif = `deep_sleep + light_sleep + rem_sleep`.
 - `awake` tidak ikut masuk ke `sleep`.
 - `sleep_wearable` adalah total tidur wearable yang ditampilkan sebagai pembanding dari jam.
-- `sleep_wearable` boleh mencakup awake jika data wearable mengirim awake.
+- `sleep_wearable` mengikuti total durasi tidur dari wearable/jam dan tidak ditambah manual dengan `awake`.
 - `rem_sleep` tetap ikut dikirim terpisah agar grafik tidur web tetap lengkap.
 - `awake` tetap ikut dikirim terpisah agar grafik tidur web tetap lengkap.
 
@@ -19,7 +19,7 @@ Contoh:
 - REM: 83 menit
 - Awake: 0 menit
 - `sleep` / tidur efektif = 395 menit = 6 jam 35 menit
-- `sleep_wearable` = `sleep + awake`
+- `sleep_wearable` = total durasi dari wearable/jam
 
 ## Field Payload Mobile
 
@@ -28,7 +28,7 @@ Mobile mengirim field berikut pada upload summary dan sleep snapshot:
 - `sleep`: total tidur efektif, tidak termasuk awake.
 - `sleep_effective`: sama dengan `sleep`.
 - `sleep_effective_minutes`: sama dengan `sleep`.
-- `sleep_wearable`: total tidur wearable, termasuk awake jika tersedia.
+- `sleep_wearable`: total tidur wearable sesuai angka jam, tidak ditambah manual dengan `awake`.
 - `sleep_wearable_minutes`: sama dengan `sleep_wearable`.
 - `sleep_decision`: keputusan kerja berdasarkan tidur efektif.
 - `light_sleep`: light sleep dalam menit.
@@ -40,7 +40,7 @@ Mobile mengirim field berikut pada upload summary dan sleep snapshot:
 - `sleep_type`: `night` atau `day`.
 - `user_sleep`: raw detail sesi/stage tidur untuk grafik.
 
-Backend sebaiknya memakai `sleep` atau `sleep_effective_minutes` untuk semua aturan keputusan kerja, Debt Sleep, dan eTicket. Jangan memakai `sleep_wearable` untuk aturan kerja karena nilai itu bisa mencakup awake.
+Backend sebaiknya memakai `sleep` atau `sleep_effective_minutes` untuk semua aturan keputusan kerja, Debt Sleep, dan eTicket. Jangan memakai `sleep_wearable` untuk aturan kerja karena nilai itu hanya pembanding angka jam.
 
 ## Aturan Keputusan Kerja
 
@@ -67,9 +67,32 @@ Mobile memakai aturan yang sama:
 ## Dashboard Mobile
 
 - `Tidur Efektif Hari Ini` memakai tidur efektif hari ini, tidak termasuk awake.
-- `Tidur Efektif Kemarin` memakai tidur efektif support/kemarin yang masuk aturan, maksimal 1 jam.
-- `Total Tidur Efektif` memakai `Tidur Efektif Hari Ini + Tidur Efektif Kemarin`, tidak termasuk awake.
-- `Total Sleep Wearable` menampilkan nilai wearable sebagai pembanding jam, termasuk awake jika ada.
+- `Tidur Efektif Hari Ini` dihitung dari rangkaian tidur utama dikurangi `awake`.
+- `Tidur Efektif Kemarin` memakai tidur efektif di luar rangkaian tidur utama, tidak termasuk awake.
+- Jika sesi tidur menyambung dari rangkaian tidur utama melewati batas range luar, bagian carryover itu tidak dihitung sebagai `Tidur Efektif Kemarin`.
+- Tidur di range luar baru dihitung setelah ada jeda bangun/non-sleep minimal 10 menit.
+- Nilai `Tidur Efektif Kemarin` yang tampil adalah total aktual di range luar rangkaian.
+- Nilai `Tidur Efektif Kemarin` yang masuk kalkulasi `Total Tidur Efektif` maksimal 1 jam.
+- `Total Tidur Efektif` memakai `Tidur Efektif Hari Ini + min(Tidur Efektif Kemarin, 1 jam)`, tidak termasuk awake.
+- `Total Sleep Wearable` menampilkan nilai wearable sebagai pembanding jam.
+
+## Range Shift
+
+Mode `night`:
+
+- Rangkaian tidur utama: `18:00 -> 12:00`.
+- Range luar rangkaian untuk `Tidur Efektif Kemarin`: `06:00 -> 18:00`.
+- Contoh: tidur `18:00 -> 06:00` masuk rangkaian `Tidur Efektif Hari Ini`, bukan `Tidur Efektif Kemarin`.
+- Jika tidur berlanjut melewati `06:00`, sisa setelah `06:00` tetap dianggap carryover tidur utama sampai operator bangun minimal 10 menit.
+
+Mode `day` / shift 2:
+
+- Rangkaian tidur utama: `06:00 -> 18:00`.
+- Range luar rangkaian untuk `Tidur Efektif Kemarin`: `18:00 -> 06:00`.
+- Contoh: tidur normal shift 2 `06:00 -> 18:00` masuk `Tidur Efektif Hari Ini`; tidur tambahan `18:00 -> 06:00` muncul sebagai `Tidur Efektif Kemarin`, tetapi kontribusi kalkulasi tetap maksimal 1 jam.
+- Jika tidur berlanjut melewati `18:00`, sisa setelah `18:00` tetap dianggap carryover tidur utama sampai operator bangun minimal 10 menit.
+
+Chart Sleep mobile memakai siklus `18:00 -> 18:00` agar segmen tidur `18:00-23:59` dan `00:00-11:59` mudah dibaca sebagai satu rangkaian.
 
 ## Debt Sleep
 

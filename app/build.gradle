@@ -104,7 +104,7 @@ android {
             // the default build product flavor
             dimension "device_type"
             applicationIdSuffix ".new"
-            versionNameSuffix "-new"
+            versionNameSuffix " X"
         }
 
         banglejs {

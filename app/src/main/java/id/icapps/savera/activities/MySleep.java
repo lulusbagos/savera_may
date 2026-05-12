@@ -375,8 +375,13 @@ public class MySleep extends Fragment {
         myData1.showAllDevices = prefs.getBoolean("dashboard_devices_all", true);
         myData1.showDeviceList = prefs.getStringSet("dashboard_devices_multiselect", new HashSet<>());
         myData1.hrIntervalSecs = prefs.getInt("dashboard_widget_today_hr_interval", 1) * 60;
-        myData1.timeTo = (int) (now.getTimeInMillis() / 1000);
-        myData1.timeFrom = DateTimeUtils.shiftDays(myData1.timeTo, -1);
+        Calendar sleepCycle = (Calendar) now.clone();
+        sleepCycle.set(Calendar.HOUR_OF_DAY, 18);
+        sleepCycle.set(Calendar.MINUTE, 0);
+        sleepCycle.set(Calendar.SECOND, 0);
+        sleepCycle.set(Calendar.MILLISECOND, 0);
+        myData1.timeTo = (int) (sleepCycle.getTimeInMillis() / 1000);
+        myData1.timeFrom = myData1.timeTo - (24 * 3600);
 
         myData2.showAllDevices = myData1.showAllDevices;
         myData2.showDeviceList = myData1.showDeviceList;
@@ -825,26 +830,11 @@ public class MySleep extends Fragment {
         private List<? extends ActivitySample> getSleepChartSamples(DBHandler db, GBDevice device) {
             SampleProvider<? extends ActivitySample> provider = getProvider(db, device);
             int[] range = getSleepChartRange();
-            return provider.getAllActivitySamples(range[0], range[1] + 3600);
+            return provider.getAllActivitySamples(range[0], range[1]);
         }
 
         private int[] getSleepChartRange() {
-            Calendar today = GregorianCalendar.getInstance();
-            int hour = today.get(Calendar.HOUR_OF_DAY);
-            today.setTimeInMillis(timeTo * 1000L);
-            today.set(Calendar.HOUR_OF_DAY, 0);
-            today.set(Calendar.MINUTE, 0);
-            today.set(Calendar.SECOND, 0);
-            today.set(Calendar.MILLISECOND, 0);
-
-            if (hour < 12) {
-                today.add(Calendar.HOUR, -6);
-            } else {
-                today.add(Calendar.HOUR, 6);
-            }
-
-            int from = (int) (today.getTimeInMillis() / 1000);
-            return new int[]{from, from + (12 * 3600)};
+            return new int[]{timeFrom, timeTo};
         }
 
         private int resolveSleepChartEnd(List<? extends ActivitySample> samples, int baseEnd) {
@@ -1187,7 +1177,17 @@ public class MySleep extends Fragment {
         long secondIndex = data.timeFrom;
         long currentTime = Calendar.getInstance().getTimeInMillis() / 1000;
         boolean dayIsToday = !(data.timeTo < currentTime);
-        int startAngle = mode_24h && upsideDown24h ? 90 : 270;
+        Calendar midnight = GregorianCalendar.getInstance();
+        midnight.setTimeInMillis(data.timeFrom * 1000L);
+        midnight.set(Calendar.HOUR_OF_DAY, 0);
+        midnight.set(Calendar.MINUTE, 0);
+        midnight.set(Calendar.SECOND, 0);
+        midnight.set(Calendar.MILLISECOND, 0);
+        if (midnight.getTimeInMillis() / 1000L <= data.timeFrom) {
+            midnight.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        int zeroHourAngle = mode_24h && upsideDown24h ? 90 : 270;
+        int startAngle = (int) (zeroHourAngle - ((midnight.getTimeInMillis() / 1000L) - data.timeFrom) / degreeFactor);
         synchronized (data.generalizedActivities) {
             for (MyData.GeneralizedActivity activity : data.generalizedActivities) {
                 // Determine margin

@@ -949,9 +949,9 @@ public class MyDashboard extends Fragment {
                                     }
                                 } else if (code == 422 || code == 401 || code == 404) {
                                     String msg = extractApiMessage(http.getResponse(), "Gagal mengambil data device.");
-                                    toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
+                                    toast(requireActivity(), msg, Toast.LENGTH_LONG, GB.ERROR);
                                 } else {
-                                    toast(requireActivity(), "Error get device registration auth key", Toast.LENGTH_SHORT, GB.ERROR);
+                                    toast(requireActivity(), http.getErrorMessage("Gagal mengambil data device registration auth key."), Toast.LENGTH_LONG, GB.ERROR);
                                     assert getActivity() != null;
                                     ((HomeActivity) getActivity()).changeViewPagerPostition(2);
                                 }
@@ -1046,9 +1046,9 @@ public class MyDashboard extends Fragment {
                                 LOG.warn("Banner endpoint not available (404), hiding banner section");
                             } else if (code == 422 || code == 401) {
                                 String msg = extractApiMessage(http.getResponse(), "Gagal mengambil banner.");
-                                toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
+                                toast(requireActivity(), msg, Toast.LENGTH_LONG, GB.ERROR);
                             } else {
-                                toast(requireActivity(), "Error get banner", Toast.LENGTH_SHORT, GB.ERROR);
+                                toast(requireActivity(), http.getErrorMessage("Gagal mengambil banner."), Toast.LENGTH_LONG, GB.ERROR);
                             }
                         }
                     });
@@ -1427,9 +1427,7 @@ public class MyDashboard extends Fragment {
                             updateUploadProgress("Upload selesai!", 2, 2);
                             toast(requireActivity(), "Success send activity details", Toast.LENGTH_SHORT, GB.INFO);
                             refreshUploadNotificationState();
-                            if (!isSleepUploaderAccount()) {
-                                sendFitToWork();
-                            }
+                            sendFitToWork();
                             showUploadProgressOverlay(false);
                             btnSync.setEnabled(true);
                             loading.setVisibility(View.GONE);
@@ -1441,7 +1439,7 @@ public class MyDashboard extends Fragment {
                         }
                     } else if (code == 422 || code == 401 || code == 404) {
                         String msg = extractApiMessage(http.getResponse(), "Gagal mengirim detail aktivitas.");
-                        toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
+                        toast(requireActivity(), msg, Toast.LENGTH_LONG, GB.ERROR);
                         showUploadProgressOverlay(false);
                         btnSync.setEnabled(true);
                         loading.setVisibility(View.GONE);
@@ -1455,7 +1453,7 @@ public class MyDashboard extends Fragment {
                             startQueueWait("detail", device, null, detailFp, data);
                         } else {
                             showUploadPendingNotification();
-                            toast(requireActivity(), "Error send activity details", Toast.LENGTH_SHORT, GB.ERROR);
+                            toast(requireActivity(), http.getErrorMessage("Gagal mengirim detail aktivitas. Data disimpan di antrian upload."), Toast.LENGTH_LONG, GB.ERROR);
                             showUploadProgressOverlay(false);
                             btnSync.setEnabled(true);
                             loading.setVisibility(View.GONE);
@@ -1548,12 +1546,8 @@ public class MyDashboard extends Fragment {
             return;
         }
 
-        if (storedDate == null || storedDate.isBlank()) {
-            isFit1 = storedFit1;
-            isFit2 = storedFit2;
-            isFit3 = storedFit3;
-            localStorage.setFitToWorkDate(today);
-        }
+        // Do not reuse answers without today's date. Operators must answer all
+        // Fit To Work questions once per day before upload.
     }
 
     private void applyFitToWorkButtonState() {
@@ -1687,7 +1681,7 @@ public class MyDashboard extends Fragment {
         
         // Validate P5M. If there is an active/fallback P5M, it must be submitted before upload.
         // If backend has no active P5M configured, upload can continue.
-        if (!isDeveloperMode() && !isSleepUploaderAccount() && !p5mUploadGatePassed && !hasP5MSubmissionForToday()) {
+        if (!isDeveloperMode() && !p5mUploadGatePassed && !hasP5MSubmissionForToday()) {
             checkP5MRequirementBeforeUpload(view);
             return;
         }
@@ -1777,7 +1771,7 @@ public class MyDashboard extends Fragment {
                         }
                     } else if (code == 422 || code == 401 || code == 404) {
                         String msg = extractApiMessage(http.getResponse(), "Gagal mengirim ringkasan aktivitas.");
-                        toast(requireActivity(), msg, Toast.LENGTH_SHORT, GB.ERROR);
+                        toast(requireActivity(), msg, Toast.LENGTH_LONG, GB.ERROR);
                         showUploadProgressOverlay(false);
                         btnSync.setEnabled(true);
                         loading.setVisibility(View.GONE);
@@ -1790,7 +1784,7 @@ public class MyDashboard extends Fragment {
                             startQueueWait("summary", device, summaryFp, null, detailData);
                         } else {
                             showUploadPendingNotification();
-                            toast(requireActivity(), "Error send activity summary", Toast.LENGTH_SHORT, GB.ERROR);
+                            toast(requireActivity(), http.getErrorMessage("Gagal mengirim ringkasan aktivitas. Data disimpan di antrian upload."), Toast.LENGTH_LONG, GB.ERROR);
                             showUploadProgressOverlay(false);
                             btnSync.setEnabled(true);
                             loading.setVisibility(View.GONE);
@@ -2514,7 +2508,7 @@ public class MyDashboard extends Fragment {
     private void handleP5MUploadCheckResponse(Http http, View retryView) {
         int statusCode = http.getStatusCode() == null ? 0 : http.getStatusCode();
         if (statusCode != 200) {
-            continueUploadAfterP5MWarning(retryView);
+            blockUploadAfterP5MWarning(http.getErrorMessage(getString(R.string.p5m_check_failed_before_upload)));
             return;
         }
 
@@ -2522,7 +2516,7 @@ public class MyDashboard extends Fragment {
             JSONObject response = new JSONObject(Objects.requireNonNullElse(http.getResponse(), "{}"));
             JSONObject data = response.optJSONObject("data");
             if (data == null) {
-                continueUploadAfterP5MWarning(retryView);
+                blockUploadAfterP5MWarning(getString(R.string.p5m_error_invalid_response));
                 return;
             }
 
@@ -2550,15 +2544,18 @@ public class MyDashboard extends Fragment {
             navigateToP5M();
         } catch (JSONException e) {
             LOG.warn("Failed parsing P5M upload check response", e);
-            continueUploadAfterP5MWarning(retryView);
+            blockUploadAfterP5MWarning(getString(R.string.p5m_error_invalid_response));
         }
     }
 
-    private void continueUploadAfterP5MWarning(View retryView) {
-        toast(requireActivity(), getString(R.string.p5m_check_failed_before_upload), Toast.LENGTH_LONG, GB.WARN);
-        p5mUploadGatePassed = true;
+    private void blockUploadAfterP5MWarning() {
+        blockUploadAfterP5MWarning(getString(R.string.p5m_check_failed_before_upload));
+    }
+
+    private void blockUploadAfterP5MWarning(String message) {
+        toast(requireActivity(), message, Toast.LENGTH_LONG, GB.WARN);
+        p5mUploadGatePassed = false;
         showUploadProgressOverlay(false);
-        sendSummary(retryView);
     }
 
     private void markTodayP5MSubmitted() {
@@ -2687,6 +2684,7 @@ public class MyDashboard extends Fragment {
         final int snapshotTimeTo = snapshotSleepTo + 3600;
         final String snapshotSleepType = myData1.sleepType == null ? "night" : myData1.sleepType;
         final long snapshotSleepTotal = myData1.sleepTotalMinutes;
+        final long snapshotSleepWearableTotal = getWearableSleepTotalMinutes(myData1);
         final long snapshotLightSleep = myData1.lightSleepTotalMinutes;
         final long snapshotDeepSleep = myData1.deepSleepTotalMinutes;
         final long snapshotRemSleep = myData1.remSleepTotalMinutes;
@@ -2722,6 +2720,7 @@ public class MyDashboard extends Fragment {
                             snapshotSleepFrom,
                             snapshotSleepTo,
                             snapshotSleepTotal,
+                            snapshotSleepWearableTotal,
                             snapshotLightSleep,
                             snapshotDeepSleep,
                             snapshotRemSleep,
@@ -2775,6 +2774,7 @@ public class MyDashboard extends Fragment {
             int sleepFrom,
             int sleepTo,
             long sleepTotal,
+            long sleepWearableTotal,
             long lightSleep,
             long deepSleep,
             long remSleep,
@@ -2795,8 +2795,8 @@ public class MyDashboard extends Fragment {
         params.put("sleep", sleepTotal);
         params.put("sleep_effective", sleepTotal);
         params.put("sleep_effective_minutes", sleepTotal);
-        params.put("sleep_wearable", sleepTotal + awakeSleep);
-        params.put("sleep_wearable_minutes", sleepTotal + awakeSleep);
+        params.put("sleep_wearable", sleepWearableTotal);
+        params.put("sleep_wearable_minutes", sleepWearableTotal);
         params.put("sleep_decision", getSleepStatusLabel(sleepTotal));
         params.put("sleep_start", sleepFrom);
         params.put("sleep_end", sleepTo);
@@ -3233,7 +3233,7 @@ public class MyDashboard extends Fragment {
             return true;
         }
 
-        PendingUploadQueue.markFailed(context, fingerprint, code == null ? 0 : code, "Upload retry belum berhasil");
+        PendingUploadQueue.markFailed(context, fingerprint, code == null ? 0 : code, http.getErrorMessage("Upload retry belum berhasil"));
         showUploadPendingNotification();
         return false;
     }
@@ -3313,6 +3313,10 @@ public class MyDashboard extends Fragment {
         int pending = summary.optInt("pending", 0);
         int sending = summary.optInt("sending", 0);
         int failed = summary.optInt("failed", 0);
+        int lastHttpStatus = summary.optInt("last_http_status", 0);
+        if (lastHttpStatus == 0 || lastHttpStatus == 500 || lastHttpStatus == 502 || lastHttpStatus == 503 || lastHttpStatus == 504) {
+            return Http.SERVER_DOWN_MESSAGE + ". Upload disimpan dan akan dicoba lagi.";
+        }
         return "Sinkronisasi tertunda. Pending " + pending + ", sending " + sending + ", gagal " + failed + ".";
     }
 
@@ -3917,11 +3921,7 @@ public class MyDashboard extends Fragment {
 
                 int sleep1 = (int) (today.getTimeInMillis() / 1000);
 
-                ActivityAmounts amountYesterday = analysis.calculateActivityAmounts(provider.getAllActivitySamples(
-                        sleep1 - (6 * 3600),
-                        sleep1
-                ));
-                totalY = getTotalsSleepForActivityAmounts(amountYesterday);
+                totalY = getOffCycleSleepTotals(provider, sleep1 - (12 * 3600), sleep1);
 
                 Calendar restStart = (Calendar) today.clone();
                 restStart.set(Calendar.HOUR_OF_DAY, 11);
@@ -3948,11 +3948,7 @@ public class MyDashboard extends Fragment {
                 today.add(Calendar.HOUR, 6);
 
                 int sleep1 = (int) (today.getTimeInMillis() / 1000);
-                ActivityAmounts amountYesterday = analysis.calculateActivityAmounts(provider.getAllActivitySamples(
-                        sleep1 - (6 * 3600),
-                        sleep1
-                ));
-                totalY = getTotalsSleepForActivityAmounts(amountYesterday);
+                totalY = getOffCycleSleepTotals(provider, sleep1 - (12 * 3600), sleep1);
 
                 Calendar restStart = (Calendar) today.clone();
                 restStart.add(Calendar.DAY_OF_MONTH, -1);
@@ -3979,7 +3975,8 @@ public class MyDashboard extends Fragment {
             }
 
             sleepFrom = (int) (today.getTimeInMillis() / 1000);
-            sleepTo = sleepFrom + (12 * 3600);
+            int mainSleepWindowHours = Objects.equals(sleepType, "night") ? 18 : 12;
+            sleepTo = sleepFrom + (mainSleepWindowHours * 3600);
 
             ActivityAmounts amountSleep = analysis.calculateActivityAmounts(provider.getAllActivitySamples(sleepFrom, sleepTo));
             long[] totalS = getTotalsSleepForActivityAmounts(amountSleep);
@@ -3988,13 +3985,60 @@ public class MyDashboard extends Fragment {
             totalT[1] = totalS[1];
             totalT[2] = totalS[2];
 
-            long sleepTodayMinutes = totalT[0] + totalT[1] + totalT[2];
+            long wearableTotalMinutes = totalT[0] + totalT[1] + totalT[2];
+            long sleepTodayMinutes = Math.max(0, wearableTotalMinutes - totalS[3]);
             long sleepYesterdayMinutes = totalY[0] + totalY[1] + totalY[2];
             long sleepRestMinutes = totalR[0] + totalR[1] + totalR[2];
-            long wearableTotalMinutes = sleepTodayMinutes
-                    + totalS[3];
 
             return new long[]{totalS[0], totalS[1], totalS[2], totalS[3], sleepTodayMinutes, sleepYesterdayMinutes, sleepRestMinutes, wearableTotalMinutes};
+        }
+
+        private long[] getOffCycleSleepTotals(SampleProvider<? extends ActivitySample> provider, int from, int to) {
+            List<? extends ActivitySample> rawSamples = provider.getAllActivitySamples(from, to);
+            List<ActivitySample> samples = new ArrayList<>(rawSamples);
+            samples.sort(Comparator.comparingInt(ActivitySample::getTimestamp));
+
+            long[] totals = new long[]{0, 0, 0, 0};
+            boolean countSleep = true;
+            int awakeGapSeconds = 0;
+
+            if (!samples.isEmpty()) {
+                ActivitySample first = samples.get(0);
+                countSleep = !(first.getTimestamp() <= from + 60 && ActivityKind.isSleep(first.getKind()));
+            }
+
+            for (ActivitySample sample : samples) {
+                if (sample.getTimestamp() < from || sample.getTimestamp() >= to) {
+                    continue;
+                }
+
+                ActivityKind kind = sample.getKind();
+                boolean sleep = ActivityKind.isSleep(kind);
+
+                if (!countSleep) {
+                    if (sleep) {
+                        awakeGapSeconds = 0;
+                    } else {
+                        awakeGapSeconds += 60;
+                        if (awakeGapSeconds >= 10 * 60) {
+                            countSleep = true;
+                        }
+                    }
+                    continue;
+                }
+
+                if (kind == ActivityKind.LIGHT_SLEEP || kind == ActivityKind.SLEEP_ANY) {
+                    totals[0] += 1;
+                } else if (kind == ActivityKind.DEEP_SLEEP) {
+                    totals[1] += 1;
+                } else if (kind == ActivityKind.REM_SLEEP) {
+                    totals[2] += 1;
+                } else if (kind == ActivityKind.AWAKE_SLEEP) {
+                    totals[3] += 1;
+                }
+            }
+
+            return totals;
         }
 
         private long capYesterdaySleepMinutes(long minutes) {
@@ -4024,14 +4068,14 @@ public class MyDashboard extends Fragment {
                     remSleepTotalMinutes += sleep[2];
                     awakeSleepTotalMinutes += sleep[3];
                     sleepToday += sleep[4];
-                    sleepYesterday += capYesterdaySleepMinutes(sleep[5]);
+                    sleepYesterday += sleep[5];
                     sleepRest += sleep[6];
                     long sleepWithoutAwake = sleep[4] + capYesterdaySleepMinutes(sleep[5]);
                     sleepTotalMinutes += sleepWithoutAwake;
                     if (sleep.length > 7 && sleep[7] > 0) {
                         sleepWearableTotalMinutes += sleep[7];
                     } else {
-                        sleepWearableTotalMinutes += sleep[0] + sleep[1] + sleep[2] + sleep[3];
+                        sleepWearableTotalMinutes += sleep[0] + sleep[1] + sleep[2];
                     }
                 }
             } catch (Exception e) {

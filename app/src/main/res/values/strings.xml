@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
-    <string name="application_name_generic">Savera 9</string>
-    <string name="title_activity_controlcenter_generic">Savera 9</string>
-    <string name="about_activity_title_generic">About Savera 9</string>
-    <string name="about_description_generic">Android companion app for Savera 9 wearable operations.</string>
-    <string name="gadgetbridge_running_generic">Savera 9 running</string>
+    <string name="application_name_generic">Savera X</string>
+    <string name="app_name">Savera X</string>
+    <string name="title_activity_controlcenter_generic">Savera X</string>
+    <string name="about_activity_title_generic">About Savera X</string>
+    <string name="title_activity_controlcenter">Savera X</string>
+    <string name="about_activity_title">About Savera X</string>
+    <string name="about_description_generic">Android companion app for Savera X wearable operations.</string>
+    <string name="about_description">Android companion app for Savera X wearable operations.</string>
+    <string name="gadgetbridge_running_generic">Savera X running</string>
+    <string name="gadgetbridge_running">Savera X running</string>
+    <string name="coexisting_savera_title">%1$s sudah ada</string>
+    <string name="coexisting_savera_message">%1$s sudah ada di device ini. %2$s tetap bisa diinstal dan digunakan terpisah.</string>
 
     <string name="base_url">https://savera_api.ungguldinamika.com/api</string>
     <string name="base_url_public">https://savera_api.ungguldinamika.com/api</string>
@@ -57,7 +64,7 @@
     <string name="p5m_error_invalid_response">Respons P5M tidak valid.</string>
     <string name="p5m_error_answer_all">Jawab semua soal P5M terlebih dahulu.</string>
     <string name="p5m_required_before_upload">P5M aktif belum diisi. Isi P5M terlebih dahulu sebelum upload data.</string>
-    <string name="p5m_check_failed_before_upload">P5M error, silakan segera menghubungi medic. Upload tetap dilanjutkan.</string>
+    <string name="p5m_check_failed_before_upload">P5M error, silakan segera menghubungi medic. Upload dibatalkan.</string>
     <string name="notification_title">Notifikasi</string>
     <string name="notification_back">Kembali</string>
     <string name="notification_reload">Muat ulang notifikasi</string>
