@@ -50,6 +50,7 @@ public final class PendingUploadQueue {
             }
             queue.put(item);
             writeQueue(context, queue);
+            PendingUploadRetryManager.scheduleRetry(context, PendingUploadRetryManager.INITIAL_RETRY_DELAY_MS);
             return true;
         } catch (JSONException e) {
             throw new RuntimeException(e);

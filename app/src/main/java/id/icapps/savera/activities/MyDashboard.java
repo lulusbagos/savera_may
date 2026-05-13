@@ -120,6 +120,7 @@ import id.icapps.savera.service.devices.xiaomi.activity.XiaomiActivityFileId;
 import id.icapps.savera.util.DateTimeUtils;
 import id.icapps.savera.util.FileUtils;
 import id.icapps.savera.util.ImageUtils;
+import id.icapps.savera.util.PendingUploadRetryManager;
 import id.icapps.savera.util.PendingUploadQueue;
 import id.icapps.savera.util.FormatUtils;
 import id.icapps.savera.util.GB;
@@ -215,7 +216,7 @@ public class MyDashboard extends Fragment {
     private static final int HEART_RATE_VALID_MAX = 240;
     private static final long RECORDED_DATA_FETCH_COOLDOWN_MS = 60 * 1000L;
     private static final String APP_VERSION_STAMP = "Savera 9";
-    private static boolean queueResetOnLaunch = false;
+    private static boolean queueRestoreOnLaunch = false;
     private long lastRecordedDataFetchMs = 0L;
     private boolean recordedDataFetchPending = false;
 
@@ -435,7 +436,7 @@ public class MyDashboard extends Fragment {
         syncEmployeeContextFromLocalStorage();
         showImage();
         updateServerStatusIndicatorFromActiveRoute();
-        resetPendingQueueOnColdStart();
+        restorePendingQueueOnColdStart();
         flushPendingUploads(false);
         refreshNotificationBadge();
         
@@ -1782,9 +1783,13 @@ public class MyDashboard extends Fragment {
                         if (!fromQueue && shouldQueueUpload(code)) {
                             String summaryKey = summaryQueueKey(device);
                             String summaryFp = PendingUploadQueue.fingerprint("summary", summaryKey);
+                            String detailUrl = getString(R.string.base_url) + "/detail";
+                            String detailKey = detailQueueKey(device);
+                            String detailFp = PendingUploadQueue.fingerprint("detail", detailKey);
                             queuePendingUpload("summary", url, summaryData, summaryKey);
+                            queuePendingUpload("detail", detailUrl, detailData, detailKey);
                             showUploadPendingNotification();
-                            startQueueWait("summary", device, summaryFp, null, detailData);
+                            startQueueWait("summary", device, summaryFp, detailFp, detailData);
                         } else {
                             showUploadPendingNotification();
                             toast(requireActivity(), http.getErrorMessage("Gagal mengirim ringkasan aktivitas. Data disimpan di antrian upload."), Toast.LENGTH_LONG, GB.ERROR);
@@ -3040,6 +3045,7 @@ public class MyDashboard extends Fragment {
     }
 
     private void onQueueWaitSuccess(String phase, GBDevice device, String detailData) {
+        String queuedDetailFingerprint = queueWaitDetailFingerprint;
         queueWaitPhase = null;
         queueWaitHandler.removeCallbacksAndMessages(null);
         refreshUploadNotificationState();
@@ -3047,7 +3053,11 @@ public class MyDashboard extends Fragment {
         if ("summary".equals(phase)) {
             toast(requireActivity(), "Summary terkirim! Mengirim detail...", Toast.LENGTH_SHORT, GB.INFO);
             updateUploadProgress("Mengirim detail...", 1, 2);
-            if (device != null && detailData != null) {
+            Context ctx = getContext();
+            if (ctx != null && queuedDetailFingerprint != null && !queuedDetailFingerprint.isEmpty()
+                    && containsFingerprint(ctx, queuedDetailFingerprint)) {
+                startQueueWait("detail", device, null, queuedDetailFingerprint, null);
+            } else if (device != null && detailData != null) {
                 sendDetail(device, detailData, false, true);
             } else {
                 showUploadProgressOverlay(false);
@@ -3288,18 +3298,15 @@ public class MyDashboard extends Fragment {
         }
     }
 
-    private void resetPendingQueueOnColdStart() {
+    private void restorePendingQueueOnColdStart() {
         Context context = getContext();
-        if (context == null || queueResetOnLaunch) {
+        if (context == null || queueRestoreOnLaunch) {
             return;
         }
 
-        PendingUploadQueue.reset(context, false);
-        queueWaitHandler.removeCallbacksAndMessages(null);
-        queueWaitPhase = null;
-        queueResetOnLaunch = true;
-        GB.removeUploadFailedNotification(context);
-        showUploadProgressOverlay(false);
+        queueRestoreOnLaunch = true;
+        PendingUploadRetryManager.scheduleRetryIfNeeded(context);
+        refreshUploadNotificationState();
     }
 
     private void refreshUploadNotificationState() {
@@ -3315,15 +3322,7 @@ public class MyDashboard extends Fragment {
     }
 
     private String buildUploadPendingNotificationText(Context context) {
-        JSONObject summary = PendingUploadQueue.summary(context);
-        int pending = summary.optInt("pending", 0);
-        int sending = summary.optInt("sending", 0);
-        int failed = summary.optInt("failed", 0);
-        int lastHttpStatus = summary.optInt("last_http_status", 0);
-        if (lastHttpStatus == 0 || lastHttpStatus == 500 || lastHttpStatus == 502 || lastHttpStatus == 503 || lastHttpStatus == 504) {
-            return Http.SERVER_DOWN_MESSAGE + ". Upload disimpan dan akan dicoba lagi.";
-        }
-        return "Sinkronisasi tertunda. Pending " + pending + ", sending " + sending + ", gagal " + failed + ".";
+        return PendingUploadRetryManager.buildNotificationText(context);
     }
 
     private void showUploadProgressOverlay(boolean show) {

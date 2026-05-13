@@ -581,6 +581,17 @@
         </receiver>
 
         <receiver
+            android:name=".externalevents.PendingUploadRetryReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="id.icapps.savera.action.RETRY_PENDING_UPLOADS" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".externalevents.BluetoothStateChangeReceiver"
             android:exported="true"
             android:permission="android.permission.BLUETOOTH,android.permission.BLUETOOTH_ADMIN">
