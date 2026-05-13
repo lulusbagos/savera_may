@@ -1600,6 +1600,13 @@ public class MyDashboard extends Fragment {
         if (btnSync.isEnabled() == false || uploadProgressOverlay.getVisibility() == View.VISIBLE) {
             return;
         }
+
+        Context pendingContext = getContext();
+        if (pendingContext != null && !PendingUploadQueue.isEmpty(pendingContext)) {
+            toast(requireActivity(), "Ada upload tertunda. Dicoba kirim ulang sekarang; kalau belum berhasil akan tetap otomatis.", Toast.LENGTH_LONG, GB.WARN);
+            flushPendingUploads(true);
+            return;
+        }
         
         // Force populate sample data for developer mode before validation
         if (isDeveloperMode()) {
@@ -2998,7 +3005,7 @@ public class MyDashboard extends Fragment {
         queueWaitPollCount          = 0;
 
         showUploadProgressOverlay(true);
-        updateUploadProgress("Menunggu server... data dalam antrian", 0, 1);
+        updateUploadProgress("Data masuk antrian. Akan retry otomatis; tekan Upload lagi untuk coba sekarang.", 0, 1);
         queueWaitHandler.postDelayed(this::pollQueueWait, QUEUE_WAIT_POLL_MS);
     }
 
@@ -3012,7 +3019,7 @@ public class MyDashboard extends Fragment {
                 + " (percobaan " + queueWaitPollCount + "/" + QUEUE_WAIT_MAX_POLLS + ")", 0, 1);
 
         if (queueWaitPollCount > QUEUE_WAIT_MAX_POLLS) {
-            abortQueueWait("Server sibuk. Data tersimpan dan akan dikirim otomatis.");
+            abortQueueWait("Server sibuk. Data tersimpan aman dan akan dikirim otomatis. Tekan Upload lagi untuk coba sekarang.");
             return;
         }
 

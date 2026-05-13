@@ -203,7 +203,7 @@ public final class PendingUploadRetryManager {
                 + ", pending " + pending
                 + ", sending " + sending
                 + ", gagal " + failed
-                + ". Akan dicoba otomatis tiap 5 menit.";
+                + ". Akan dicoba otomatis tiap 5 menit. Tekan Upload untuk coba sekarang.";
     }
 
     private static PendingIntent retryPendingIntent(Context context, int flags) {
