@@ -2361,6 +2361,10 @@ public class MyDashboard extends Fragment {
 
             JSONObject params = new JSONObject();
             try {
+                params.put("sync_id", syncId);
+                params.put("upload_id", syncId);
+                params.put("range_start_ts", rangeStartTs);
+                params.put("range_end_ts", rangeEndTs);
                 params.put("active", myData1.getActiveMinutesTotal());
                 params.put("steps", myData1.getStepsTotal());
                 int summaryHr = myData1.getHeartRate();
@@ -2955,6 +2959,10 @@ public class MyDashboard extends Fragment {
 
             JSONObject params = new JSONObject();
             try {
+                params.put("sync_id", syncId);
+                params.put("upload_id", syncId);
+                params.put("range_start_ts", rangeStartTs);
+                params.put("range_end_ts", rangeEndTs);
                 params.put("device_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date(myData2.timeTo * 1000L)));
                 params.put("mac_address", device.getAddress());
                 params.put("app_version", getAppVersionStamp());
