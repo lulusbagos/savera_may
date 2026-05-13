@@ -53,6 +53,9 @@ import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
 import org.apache.commons.lang3.tuple.Triple;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +79,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import id.icapps.savera.GBApplication;
+import id.icapps.savera.Http;
+import id.icapps.savera.LocalStorage;
 import id.icapps.savera.R;
 import id.icapps.savera.activities.charts.ActivityAnalysis;
 import id.icapps.savera.activities.charts.ChartsData;
@@ -109,15 +114,23 @@ import id.icapps.savera.util.Prefs;
 
 public class MySleep extends Fragment {
     private static final Logger LOG = LoggerFactory.getLogger(MySleep.class);
+    private static final int TARGET_SLEEP_MINUTES = 7 * 60;
+    private static final int SUMMARY_WEEK_HTTP_CACHE_SECONDS = 5 * 60;
+    private static final long SUMMARY_WEEK_CACHE_MAX_AGE_MS = TimeUnit.MINUTES.toMillis(5);
     private static Calendar now = GregorianCalendar.getInstance();
     private TextView textDate, arrowLeft, arrowRight;
+    private TextView textSummarySleepValue, textSleepDebtValue, textSleepDebtBadge;
+    private TextView textSummaryWeekAverage, textSummaryWeekRange, textSummaryWeekSource;
     private ImageView imgClock1, imgClock2, imgArrow1, imgArrow2;
     private LineChart activityChart;
     private final Map<String, AbstractDashboardWidget> widgetMap = new HashMap<>();
     private MyData myData1 = new MyData();
     private MyData myData2 = new MyData();
     private boolean isConfigChanged = false;
+    private boolean summaryWeekLoading = false;
+    private long summaryWeekLastRequestMs = 0L;
     private boolean mode_24h;
+    private LocalStorage localStorage;
 
     public static final String ACTION_CONFIG_CHANGE = "id.icapps.savera.activities.dashboardfragment.action.config_change";
     public static final float Y_VALUE_DEEP_SLEEP = 0.01f;
@@ -210,6 +223,16 @@ public class MySleep extends Fragment {
 
         Prefs prefs = GBApplication.getPrefs();
         mode_24h = prefs.getBoolean("dashboard_widget_today_24h", true);
+        localStorage = new LocalStorage(requireContext());
+
+        textSummarySleepValue = view.findViewById(R.id.textSummarySleepValue);
+        textSleepDebtValue = view.findViewById(R.id.textSleepDebtValue);
+        textSleepDebtBadge = view.findViewById(R.id.textSleepDebtBadge);
+        textSummaryWeekAverage = view.findViewById(R.id.textSummaryWeekAverage);
+        textSummaryWeekRange = view.findViewById(R.id.textSummaryWeekRange);
+        textSummaryWeekSource = view.findViewById(R.id.textSummaryWeekSource);
+        resetSummaryWeekUi("Menunggu summary server");
+        applyCachedSummaryWeek();
 
         calendarLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -336,6 +359,8 @@ public class MySleep extends Fragment {
             fullRefresh();
         } else if (myData1.isEmpty() || !widgetMap.containsKey("today")) {
             refresh();
+        } else {
+            loadSummaryWeek(false);
         }
     }
 
@@ -367,6 +392,7 @@ public class MySleep extends Fragment {
         assert getActivity() != null;
         ((HomeActivity) getActivity()).setDateNow(now);
         refreshChart();
+        loadSummaryWeek(false);
     }
 
     private void reloadPreferences() {
@@ -417,6 +443,276 @@ public class MySleep extends Fragment {
             imgArrow2.animate().rotation(6 * 15).setDuration(5000).start();
         } else {
             imgArrow2.animate().rotation(18 * 15).setDuration(5000).start();
+        }
+    }
+
+    private void applyCachedSummaryWeek() {
+        if (localStorage == null) {
+            return;
+        }
+
+        String cachedPayload = localStorage.getSummaryWeekCache();
+        if (cachedPayload.isEmpty()) {
+            return;
+        }
+
+        applySummaryWeekPayload(cachedPayload, true);
+    }
+
+    private void loadSummaryWeek(boolean forceRefresh) {
+        if (!isAdded() || localStorage == null) {
+            return;
+        }
+
+        applyCachedSummaryWeek();
+
+        long nowMs = System.currentTimeMillis();
+        if (!forceRefresh && localStorage.hasFreshSummaryWeekCache(SUMMARY_WEEK_CACHE_MAX_AGE_MS)) {
+            return;
+        }
+        if (!forceRefresh && summaryWeekLoading) {
+            return;
+        }
+        if (!forceRefresh && summaryWeekLastRequestMs > 0L
+                && nowMs - summaryWeekLastRequestMs < SUMMARY_WEEK_CACHE_MAX_AGE_MS) {
+            return;
+        }
+
+        summaryWeekLoading = true;
+        summaryWeekLastRequestMs = nowMs;
+        if (textSummaryWeekSource != null) {
+            textSummaryWeekSource.setText("Mengambil summary server...");
+        }
+
+        final Context appContext = requireContext().getApplicationContext();
+        final String url = getString(R.string.base_url)
+                + "/mobile/summary-week"
+                + (forceRefresh ? "?refresh=1" : "");
+
+        new Thread(() -> {
+            Http http = new Http(appContext, url);
+            http.setMethod("get");
+            http.setToken(true);
+            http.setCacheTtlSeconds(SUMMARY_WEEK_HTTP_CACHE_SECONDS);
+            http.setMaxAttempts(1);
+            http.setConnectTimeoutMs(10000);
+            http.setReadTimeoutMs(15000);
+            http.send();
+
+            Activity activity = getActivity();
+            if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+                summaryWeekLoading = false;
+                return;
+            }
+
+            activity.runOnUiThread(() -> {
+                summaryWeekLoading = false;
+                Integer statusCode = http.getStatusCode();
+                if (statusCode != null && statusCode == 200 && http.getResponse() != null) {
+                    localStorage.setSummaryWeekCache(http.getResponse());
+                    applySummaryWeekPayload(http.getResponse(), false);
+                    return;
+                }
+
+                if (localStorage.getSummaryWeekCache().isEmpty()) {
+                    resetSummaryWeekUi("Summary server belum tersedia");
+                } else if (textSummaryWeekSource != null) {
+                    textSummaryWeekSource.setText("Memakai cache terakhir, server belum merespons");
+                }
+            });
+        }).start();
+    }
+
+    @SuppressLint("SetTextI18n")
+    private void applySummaryWeekPayload(String responseJson, boolean fromLocalCache) {
+        if (responseJson == null || responseJson.trim().isEmpty()) {
+            return;
+        }
+
+        try {
+            JSONObject payload = new JSONObject(responseJson);
+            JSONObject summary = payload.optJSONObject("summary");
+            JSONObject range = payload.optJSONObject("range");
+            JSONObject daily = findDailySummaryForSelectedDate(payload.optJSONArray("daily"));
+
+            String rangeText = formatSummaryRange(range);
+            if (textSummaryWeekRange != null) {
+                textSummaryWeekRange.setText(rangeText);
+            }
+
+            if (textSummaryWeekAverage != null) {
+                String averageText = summary == null ? "-" : summary.optString("avg_sleep_text", "-");
+                textSummaryWeekAverage.setText(averageText == null || averageText.trim().isEmpty() ? "-" : averageText);
+            }
+
+            if (daily == null) {
+                resetSummarySleepValues("Belum ada upload untuk tanggal ini");
+                if (textSummaryWeekSource != null) {
+                    textSummaryWeekSource.setText(sourceLabel(fromLocalCache, "tanggal ini kosong"));
+                }
+                return;
+            }
+
+            int sleepMinutes = Math.max(0, daily.optInt("sleep_minutes", 0));
+            int sleepDebtMinutes = Math.max(0, TARGET_SLEEP_MINUTES - sleepMinutes);
+            String category = daily.optString("sleep_category", categoryFromSleepMinutes(sleepMinutes));
+            String latestUpload = daily.optString("latest_send_time", "");
+
+            if (textSummarySleepValue != null) {
+                textSummarySleepValue.setText(formatSleepMinutes(sleepMinutes, "-"));
+            }
+            if (textSleepDebtValue != null) {
+                textSleepDebtValue.setText(sleepDebtMinutes == 0
+                        ? "Tidak ada"
+                        : formatSleepMinutes(sleepDebtMinutes, "0 menit"));
+            }
+            if (textSleepDebtBadge != null) {
+                textSleepDebtBadge.setText(category);
+                applyDebtBadgeStyle(sleepMinutes);
+            }
+            if (textSummaryWeekSource != null) {
+                String note = latestUpload == null || latestUpload.trim().isEmpty()
+                        ? "berdasarkan summary"
+                        : "upload " + latestUpload + " WITA";
+                textSummaryWeekSource.setText(sourceLabel(fromLocalCache, note));
+            }
+        } catch (JSONException e) {
+            LOG.warn("Could not parse summary-week payload", e);
+            resetSummaryWeekUi("Format summary server belum valid");
+        }
+    }
+
+    private JSONObject findDailySummaryForSelectedDate(JSONArray dailyRows) {
+        if (dailyRows == null || dailyRows.length() == 0) {
+            return null;
+        }
+
+        String selectedDate = selectedDateKey();
+        JSONObject latest = null;
+        for (int i = 0; i < dailyRows.length(); i++) {
+            JSONObject row = dailyRows.optJSONObject(i);
+            if (row == null) {
+                continue;
+            }
+            latest = row;
+            if (selectedDate.equals(row.optString("date", ""))) {
+                return row;
+            }
+        }
+
+        return latest != null && selectedDate.equals(latest.optString("date", "")) ? latest : null;
+    }
+
+    private String selectedDateKey() {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(now.getTime());
+    }
+
+    private String formatSummaryRange(JSONObject range) {
+        if (range == null) {
+            return "7 hari terakhir";
+        }
+
+        String from = formatIsoDateShort(range.optString("date_from", ""));
+        String to = formatIsoDateShort(range.optString("date_to", ""));
+        if (from.isEmpty() || to.isEmpty()) {
+            return "7 hari terakhir";
+        }
+        return from + " - " + to;
+    }
+
+    private String formatIsoDateShort(String isoDate) {
+        if (isoDate == null || isoDate.trim().isEmpty()) {
+            return "";
+        }
+
+        try {
+            Date parsed = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).parse(isoDate);
+            if (parsed == null) {
+                return "";
+            }
+            return new SimpleDateFormat("dd MMM", Locale.getDefault()).format(parsed);
+        } catch (Exception ignored) {
+            return isoDate;
+        }
+    }
+
+    private String sourceLabel(boolean fromLocalCache, String note) {
+        String prefix = fromLocalCache ? "Cache lokal" : "Summary server";
+        String suffix = note == null || note.trim().isEmpty() ? "cache 5 menit" : note.trim();
+        return prefix + " - " + suffix;
+    }
+
+    private String formatSleepMinutes(int minutes, String emptyText) {
+        if (minutes <= 0) {
+            return emptyText;
+        }
+        return String.format(
+                Locale.ROOT,
+                "%d jam %02d menit",
+                (int) Math.floor(minutes / 60f),
+                minutes % 60
+        );
+    }
+
+    private String categoryFromSleepMinutes(int minutes) {
+        if (minutes < 270) {
+            return "Langsung dipulangkan";
+        }
+        if (minutes < 300) {
+            return "Istirahat minimal 2 jam";
+        }
+        if (minutes < 330) {
+            return "Istirahat minimal 1 jam";
+        }
+        if (minutes < 360) {
+            return "Dapat bekerja";
+        }
+        return "Langsung bekerja";
+    }
+
+    private void applyDebtBadgeStyle(int sleepMinutes) {
+        if (textSleepDebtBadge == null) {
+            return;
+        }
+
+        if (sleepMinutes <= 0 || sleepMinutes < 270) {
+            textSleepDebtBadge.setBackgroundResource(R.drawable.bg_sleep_status_red);
+            textSleepDebtBadge.setTextColor(Color.parseColor("#7F1D1D"));
+            return;
+        }
+        if (sleepMinutes < 330) {
+            textSleepDebtBadge.setBackgroundResource(R.drawable.bg_sleep_status_yellow);
+            textSleepDebtBadge.setTextColor(Color.parseColor("#92400E"));
+            return;
+        }
+        textSleepDebtBadge.setBackgroundResource(R.drawable.bg_sleep_status_green);
+        textSleepDebtBadge.setTextColor(Color.parseColor("#166534"));
+    }
+
+    private void resetSummaryWeekUi(String sourceText) {
+        resetSummarySleepValues(sourceText);
+        if (textSummaryWeekAverage != null) {
+            textSummaryWeekAverage.setText("-");
+        }
+        if (textSummaryWeekRange != null) {
+            textSummaryWeekRange.setText("7 hari terakhir");
+        }
+    }
+
+    private void resetSummarySleepValues(String sourceText) {
+        if (textSummarySleepValue != null) {
+            textSummarySleepValue.setText("-");
+        }
+        if (textSleepDebtValue != null) {
+            textSleepDebtValue.setText("-");
+        }
+        if (textSleepDebtBadge != null) {
+            textSleepDebtBadge.setText("Menunggu summary");
+            textSleepDebtBadge.setBackgroundResource(R.drawable.bg_sleep_status_yellow);
+            textSleepDebtBadge.setTextColor(Color.parseColor("#92400E"));
+        }
+        if (textSummaryWeekSource != null) {
+            textSummaryWeekSource.setText(sourceText == null ? "" : sourceText);
         }
     }
 

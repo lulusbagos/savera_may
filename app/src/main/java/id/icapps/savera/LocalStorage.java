@@ -35,6 +35,8 @@ public class LocalStorage {
     private static final String KEY_LAST_SLEEP_SNAPSHOT = "LAST_SLEEP_SNAPSHOT";
     private static final String KEY_NOTIFICATION_CACHE = "NOTIFICATION_CACHE";
     private static final String KEY_NOTIFICATION_CACHE_SYNCED_AT = "NOTIFICATION_CACHE_SYNCED_AT";
+    private static final String KEY_SUMMARY_WEEK_CACHE = "SUMMARY_WEEK_CACHE";
+    private static final String KEY_SUMMARY_WEEK_CACHE_SYNCED_AT = "SUMMARY_WEEK_CACHE_SYNCED_AT";
 
     SharedPreferences sharedPreferences;
     SharedPreferences.Editor editor;
@@ -275,6 +277,40 @@ public class LocalStorage {
         }
 
         long syncedAt = getNotificationCacheSyncedAt();
+        return syncedAt > 0L && (System.currentTimeMillis() - syncedAt) <= maxAgeMs;
+    }
+
+    public String getSummaryWeekCache() {
+        String value = sharedPreferences.getString(KEY_SUMMARY_WEEK_CACHE, "");
+        return value == null ? "" : value;
+    }
+
+    public long getSummaryWeekCacheSyncedAt() {
+        return sharedPreferences.getLong(KEY_SUMMARY_WEEK_CACHE_SYNCED_AT, 0L);
+    }
+
+    public void setSummaryWeekCache(String responseJson) {
+        if (responseJson == null || responseJson.trim().isEmpty()) {
+            return;
+        }
+
+        editor.putString(KEY_SUMMARY_WEEK_CACHE, responseJson);
+        editor.putLong(KEY_SUMMARY_WEEK_CACHE_SYNCED_AT, System.currentTimeMillis());
+        editor.commit();
+    }
+
+    public void clearSummaryWeekCache() {
+        editor.remove(KEY_SUMMARY_WEEK_CACHE);
+        editor.remove(KEY_SUMMARY_WEEK_CACHE_SYNCED_AT);
+        editor.commit();
+    }
+
+    public boolean hasFreshSummaryWeekCache(long maxAgeMs) {
+        if (maxAgeMs <= 0L) {
+            return false;
+        }
+
+        long syncedAt = getSummaryWeekCacheSyncedAt();
         return syncedAt > 0L && (System.currentTimeMillis() - syncedAt) <= maxAgeMs;
     }
 

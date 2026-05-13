@@ -38,9 +38,11 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.text.SimpleDateFormat;
 
 import id.icapps.savera.GBApplication;
+import id.icapps.savera.Http;
 import id.icapps.savera.LocalStorage;
 import id.icapps.savera.R;
 import id.icapps.savera.activities.charts.ActivityAnalysis;
@@ -63,6 +65,8 @@ public class MyLeaderboard extends Fragment {
     private static final String KEY_DATA_CLEARED_V1 = "data_cleared_v1";
     private static final int WEEKLY_RETENTION_DAYS = 7;
     private static final int TARGET_SLEEP_MINUTES = 7 * 60;
+    private static final int SUMMARY_WEEK_HTTP_CACHE_SECONDS = 5 * 60;
+    private static final long SUMMARY_WEEK_CACHE_MAX_AGE_MS = TimeUnit.MINUTES.toMillis(5);
     private static final int SLEEP_WINDOW_OFFSET_HOURS = 6; // Match dashboard sleep boundary.
     private static final int SLEEP_WINDOW_TOTAL_HOURS = 12;
     private static final int SUPPORT_SLEEP_CAP_MINUTES = 60;
@@ -81,6 +85,16 @@ public class MyLeaderboard extends Fragment {
         private long timestamp;
         private long sleepMinutes;
         private long debtMinutes;
+    }
+
+    private static class DebtSleepResult {
+        private final List<DebtSleepEntry> entries;
+        private final String sourceLabel;
+
+        private DebtSleepResult(List<DebtSleepEntry> entries, String sourceLabel) {
+            this.entries = entries;
+            this.sourceLabel = sourceLabel;
+        }
     }
 
     @Override
@@ -152,17 +166,119 @@ public class MyLeaderboard extends Fragment {
     private void loadDebtSleep() {
         listProgress.setVisibility(View.VISIBLE);
         new Thread(() -> {
-            List<DebtSleepEntry> entries = calculateWeeklyDebtSleepFromEffectiveSleep();
-            final List<DebtSleepEntry> finalEntries = entries;
+            DebtSleepResult result = loadDebtSleepFromSummaryWeek();
 
             Activity activity = getActivity();
             if (activity != null && !activity.isFinishing() && !activity.isDestroyed()) {
                 activity.runOnUiThread(() -> {
-                    renderDebtSleep(finalEntries);
+                    renderDebtSleep(result.entries, result.sourceLabel);
                     listProgress.setVisibility(View.GONE);
                 });
             }
         }).start();
+    }
+
+    private DebtSleepResult loadDebtSleepFromSummaryWeek() {
+        String cachedPayload = localStorage == null ? "" : localStorage.getSummaryWeekCache();
+        if (localStorage != null && localStorage.hasFreshSummaryWeekCache(SUMMARY_WEEK_CACHE_MAX_AGE_MS)
+                && !cachedPayload.isEmpty()) {
+            return new DebtSleepResult(parseSummaryWeekEntries(cachedPayload), "Cache lokal - dari tabel summary");
+        }
+
+        String serverPayload = requestSummaryWeekPayload(false);
+        if (serverPayload != null && !serverPayload.trim().isEmpty()) {
+            if (localStorage != null) {
+                localStorage.setSummaryWeekCache(serverPayload);
+            }
+            return new DebtSleepResult(parseSummaryWeekEntries(serverPayload), "Summary server - cache 5 menit");
+        }
+
+        if (cachedPayload != null && !cachedPayload.trim().isEmpty()) {
+            return new DebtSleepResult(parseSummaryWeekEntries(cachedPayload), "Cache terakhir - server belum merespons");
+        }
+
+        return new DebtSleepResult(new ArrayList<>(), "Belum ada summary server");
+    }
+
+    private String requestSummaryWeekPayload(boolean forceRefresh) {
+        Context context = getContext();
+        if (context == null) {
+            return null;
+        }
+
+        String url = getString(R.string.base_url)
+                + "/mobile/summary-week"
+                + (forceRefresh ? "?refresh=1" : "");
+        Http http = new Http(context.getApplicationContext(), url);
+        http.setMethod("get");
+        http.setToken(true);
+        http.setCacheTtlSeconds(SUMMARY_WEEK_HTTP_CACHE_SECONDS);
+        http.setMaxAttempts(1);
+        http.setConnectTimeoutMs(10000);
+        http.setReadTimeoutMs(15000);
+        http.send();
+
+        Integer statusCode = http.getStatusCode();
+        if (statusCode != null && statusCode == 200) {
+            return http.getResponse();
+        }
+
+        LOG.warn("Debt Sleep summary-week request failed with HTTP {}", statusCode);
+        return null;
+    }
+
+    private List<DebtSleepEntry> parseSummaryWeekEntries(String payload) {
+        List<DebtSleepEntry> entries = new ArrayList<>();
+        if (payload == null || payload.trim().isEmpty()) {
+            return entries;
+        }
+
+        try {
+            JSONObject response = new JSONObject(payload);
+            JSONArray daily = response.optJSONArray("daily");
+            if (daily == null) {
+                return entries;
+            }
+
+            for (int i = 0; i < daily.length(); i++) {
+                JSONObject row = daily.optJSONObject(i);
+                if (row == null) {
+                    continue;
+                }
+
+                String dateKey = row.optString("date", "");
+                long sleepMinutes = Math.max(0L, row.optLong("sleep_minutes", 0L));
+                if (dateKey.trim().isEmpty() || sleepMinutes <= 0L) {
+                    continue;
+                }
+
+                DebtSleepEntry entry = new DebtSleepEntry();
+                entry.dateKey = dateKey;
+                entry.timestamp = parseDateMillis(dateKey);
+                entry.sleepMinutes = sleepMinutes;
+                entry.debtMinutes = Math.max(0L, TARGET_SLEEP_MINUTES - sleepMinutes);
+                entries.add(entry);
+            }
+        } catch (JSONException e) {
+            LOG.warn("Failed to parse summary-week debt sleep", e);
+        }
+
+        sortEntriesDesc(entries);
+        if (entries.size() > WEEKLY_RETENTION_DAYS) {
+            return new ArrayList<>(entries.subList(0, WEEKLY_RETENTION_DAYS));
+        }
+        return entries;
+    }
+
+    private long parseDateMillis(String dateKey) {
+        try {
+            Date parsed = keyDateFormat.parse(dateKey);
+            if (parsed != null) {
+                return parsed.getTime();
+            }
+        } catch (Exception ignored) {
+        }
+        return System.currentTimeMillis();
     }
 
     private List<DebtSleepEntry> calculateWeeklyDebtSleepFromEffectiveSleep() {
@@ -339,7 +455,7 @@ public class MyLeaderboard extends Fragment {
         return null;
     }
 
-    private void renderDebtSleep(List<DebtSleepEntry> entries) {
+    private void renderDebtSleep(List<DebtSleepEntry> entries, String sourceLabel) {
         textPeriod.setText("Debt Sleep - 7 Hari");
         String nameVal = employeeName != null && !employeeName.isEmpty() ? employeeName : "-";
         String nikVal = "NIK: " + (employeeCode != null && !employeeCode.isEmpty() ? employeeCode : "-");
@@ -367,14 +483,17 @@ public class MyLeaderboard extends Fragment {
             textTotal.setTextColor(Color.BLACK);
         }
         textAverage.setText(formatMinutes(avgSleep));
-        textRank.setText("Target 7 jam/hari - Data " + entries.size() + "/7 hari");
+        String sourceText = sourceLabel == null || sourceLabel.trim().isEmpty()
+                ? "dari tabel summary"
+                : sourceLabel.trim();
+        textRank.setText("Target 7 jam/hari - Data " + entries.size() + "/7 hari - " + sourceText);
 
         listView.removeAllViews();
         LayoutInflater inflater = LayoutInflater.from(getContext());
 
         if (entries.isEmpty()) {
             TextView empty = new TextView(getContext());
-            empty.setText("Belum ada data tidur wearable untuk 7 hari terakhir.");
+            empty.setText("Belum ada data summary untuk 7 hari terakhir. Upload dari dashboard agar summary server terbentuk.");
             empty.setTextColor(0xFF6B7280);
             empty.setTextSize(12f);
             listView.addView(empty);

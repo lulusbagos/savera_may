@@ -1760,6 +1760,9 @@ public class MyDashboard extends Fragment {
                                        lastSummaryId = summaryPayload.optInt("summary_id", summaryPayload.optInt("id", 0));
                                    }
                                }
+                            if (localStorage != null) {
+                                localStorage.clearSummaryWeekCache();
+                            }
                             toast(requireActivity(), "Success send activity summary", Toast.LENGTH_SHORT, GB.INFO);
                             updateUploadProgress("Summary terkirim, mengirim detail...", 1, 2);
                             sendDetail(device, detailData, false, true);
@@ -3229,6 +3232,9 @@ public class MyDashboard extends Fragment {
                 }
             }
             PendingUploadQueue.markSentAndRemove(context, fingerprint);
+            if ("summary".equals(kind) && localStorage != null) {
+                localStorage.clearSummaryWeekCache();
+            }
             refreshUploadNotificationState();
             return true;
         }
