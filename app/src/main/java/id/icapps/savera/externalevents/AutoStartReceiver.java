@@ -24,12 +24,17 @@ import android.util.Log;
 
 import id.icapps.savera.GBApplication;
 import id.icapps.savera.database.PeriodicExporter;
+import id.icapps.savera.util.PendingUploadRetryManager;
 
 public class AutoStartReceiver extends BroadcastReceiver {
     private static final String TAG = AutoStartReceiver.class.getName();
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()) ||
+                Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) {
+            PendingUploadRetryManager.scheduleRetryIfNeeded(context);
+        }
 
         if (GBApplication.getPrefs().getAutoStart() &&
                 (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()) ||
