@@ -4005,8 +4005,8 @@ public class MyDashboard extends Fragment {
             totalT[1] = totalS[1];
             totalT[2] = totalS[2];
 
-            long wearableTotalMinutes = totalT[0] + totalT[1] + totalT[2];
-            long sleepTodayMinutes = Math.max(0, wearableTotalMinutes - totalS[3]);
+            long sleepTodayMinutes = totalT[0] + totalT[1] + totalT[2];
+            long wearableTotalMinutes = sleepTodayMinutes + totalS[3];
             long sleepYesterdayMinutes = totalY[0] + totalY[1] + totalY[2];
             long sleepRestMinutes = totalR[0] + totalR[1] + totalR[2];
 
